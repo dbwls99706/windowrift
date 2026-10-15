@@ -62,11 +62,42 @@ def grabcut_foreground(image: Image.Image, *, trim: bool = True) -> Image.Image:
     return trim_alpha(out) if trim else out
 
 
+def color_key_foreground(image: Image.Image, *, trim: bool = True, tolerance: int = 7) -> Image.Image:
+    """Remove an almost-flat background sampled from all four crop corners.
+
+    Designed for pixel art and solid-color app surfaces, not for photographs.
+    Never removes pixels from an arbitrary remote source or calls a model.
+    """
+    import cv2
+    import numpy as np
+
+    rgb = np.asarray(image.convert("RGB"), dtype=np.uint8)
+    if min(image.size) < 16:
+        raise SegmentationError("Color key needs at least a 16 x 16 selection.")
+    corners = np.stack([rgb[0,0], rgb[0,-1], rgb[-1,0], rgb[-1,-1]])
+    baseline = np.median(corners.astype(np.int16), axis=0)
+    if np.max(np.abs(corners.astype(np.int16) - baseline)) > tolerance:
+        raise SegmentationError(
+            "The corners have different colors. Use GrabCut or select a flat-background region."
+        )
+    distance = np.max(np.abs(rgb.astype(np.int16) - baseline), axis=2)
+    visible = (distance > tolerance).astype(np.uint8)
+    num, labels, stats, _ = cv2.connectedComponentsWithStats(visible, connectivity=8)
+    if num <= 1:
+        raise SegmentationError("No foreground differs from the selected background.")
+    largest = 1 + int(np.argmax(stats[1:, cv2.CC_STAT_AREA]))
+    alpha = np.where(labels == largest, 255, 0).astype(np.uint8)
+    result = Image.fromarray(np.dstack((rgb, alpha)), "RGBA")
+    return trim_alpha(result, padding=2) if trim else result
+
+
 def extract_object(image: Image.Image, mode: str, *, trim: bool = True) -> Image.Image:
     if mode == "crop":
         return image.convert("RGBA")
     if mode == "grabcut":
         return grabcut_foreground(image, trim=trim)
+    if mode == "color-key":
+        return color_key_foreground(image, trim=trim)
     if mode == "ai":
         try:
             from rembg import remove

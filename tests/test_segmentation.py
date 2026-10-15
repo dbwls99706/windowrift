@@ -53,3 +53,24 @@ def test_live_extract_retains_crop_size_and_alpha_mask():
     assert result.size == (100, 100)
     alpha = np.asarray(result.getchannel('A'))
     assert np.any(alpha == 255) and np.any(alpha == 0)
+
+
+def test_color_key_removes_flat_background_and_keeps_dark_outline():
+    from windowrift.segmentation import color_key_foreground
+    from PIL import ImageDraw
+    image = Image.new('RGB', (80, 70), (25, 41, 62))
+    draw = ImageDraw.Draw(image)
+    draw.rectangle((24, 20, 53, 49), fill=(17, 35, 56))
+    draw.rectangle((28, 25, 49, 44), fill=(80, 240, 185))
+    result = color_key_foreground(image, trim=False)
+    assert result.getpixel((0, 0))[3] == 0
+    assert result.getpixel((25, 21))[3] == 255
+    assert result.getpixel((37, 36))[3] == 255
+
+
+def test_color_key_rejects_mixed_corners():
+    from windowrift.segmentation import color_key_foreground, SegmentationError
+    image = Image.new('RGB', (40, 40), (25, 41, 62))
+    image.putpixel((0, 0), (250, 40, 40))
+    with pytest.raises(SegmentationError, match='different colors'):
+        color_key_foreground(image)

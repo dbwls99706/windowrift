@@ -5,6 +5,7 @@ from __future__ import annotations
 import sys
 import time
 from concurrent.futures import Future, ThreadPoolExecutor
+from dataclasses import dataclass
 
 from PIL import Image
 from PySide6.QtCore import QObject, QThreadPool, QTimer, QRunnable, Signal
@@ -18,7 +19,8 @@ from .bridge import BrowserBridge
 from .capture import capture_region, capture_window_with_origin
 from .crop_dialog import CropDialog
 from .geometry import Rect, advance
-from .live import SourceCrop, composite_live_frame, overlaps
+from .live import SourceCrop, composite_live_frame, overlaps, tracking_region
+from .tracking import locate_object
 from .segmentation import extract_object
 from .sprites import Sprite
 from .windows import AppWindow, WindowDiscoveryError, activate_window, list_windows
@@ -46,6 +48,14 @@ class ExtractionJob(QRunnable):
             self.signals.success.emit(result)
 
 
+@dataclass
+class LiveBinding:
+    sprite: Sprite
+    crop: SourceCrop
+    matte: Image.Image
+    tracking: bool
+
+
 class ControlPanel(QWidget):
     def __init__(self):
         super().__init__()
@@ -55,9 +65,9 @@ class ControlPanel(QWidget):
         self.windows: list[AppWindow] = []
         self.sprites: list[Sprite] = []
         self._next_actor_id = 1
-        self._live_sources: dict[int, tuple[Sprite, SourceCrop, Image.Image]] = {}
+        self._live_sources: dict[int, LiveBinding] = {}
         self._live_executor = ThreadPoolExecutor(max_workers=1)
-        self._live_future: Future[tuple[int, Image.Image]] | None = None
+        self._live_future: Future[tuple[int, Image.Image | None, SourceCrop | None]] | None = None
         self._last_live = 0.0
         self._live_cursor = 0
         self.jobs: list[ExtractionJob] = []
@@ -96,15 +106,20 @@ class ControlPanel(QWidget):
         root.addWidget(QLabel("2. Foreground extraction"))
         self.method = QComboBox()
         self.method.addItem("Fast local GrabCut (CPU)", "grabcut")
+        self.method.addItem("Pixel art / flat background color key", "color-key")
         self.method.addItem("AI foreground removal (rembg, optional)", "ai")
         self.method.addItem("Rectangle only (debug)", "crop")
         root.addWidget(self.method)
         self.live_mode = QCheckBox("Live pixels: refresh the captured object while its source is visible")
         self.live_mode.setChecked(False)
         root.addWidget(self.live_mode)
+        self.track_motion = QCheckBox("Track motion in source (experimental, ±72 px per sample)")
+        self.track_motion.setEnabled(False)
+        self.live_mode.toggled.connect(self.track_motion.setEnabled)
+        root.addWidget(self.track_motion)
         live_note = QLabel(
-            "Experimental: a fixed source crop and alpha mask, not game-state tracking. "
-            "Drag the extracted object away from its source before using Live pixels."
+            "Live pixels reuses the selected alpha mask. Tracking searches nearby visible "
+            "pixels; it does not read or change the original program state."
         )
         live_note.setWordWrap(True)
         live_note.setObjectName("muted")
@@ -232,7 +247,7 @@ class ControlPanel(QWidget):
         job = ExtractionJob(cropped, mode, trim=not live)
         self.jobs.append(job)
         job.signals.success.connect(
-            lambda image, j=job, p=origin, c=crop if live else None: self._extracted(j, image, p, c)
+            lambda image, j=job, p=origin, c=crop if live else None, t=self.track_motion.isChecked(): self._extracted(j, image, p, c, t)
         )
         job.signals.failure.connect(lambda error, j=job: self._extract_failed(j, error))
         self.pool.start(job)
@@ -243,6 +258,7 @@ class ControlPanel(QWidget):
         image: Image.Image,
         position: tuple[int, int],
         crop: SourceCrop | None,
+        tracking: bool = False,
     ):
         if job in self.jobs:
             self.jobs.remove(job)
@@ -254,9 +270,9 @@ class ControlPanel(QWidget):
         sprite.removed.connect(self.remove_sprite)
         self.sprites.append(sprite)
         if crop is not None:
-            self._live_sources[sprite.actor_id] = (sprite, crop, image.copy())
+            self._live_sources[sprite.actor_id] = LiveBinding(sprite, crop, image.copy(), tracking)
         self.extract_button.setEnabled(True)
-        state = "Live pixels enabled" if crop is not None else "Static sprite"
+        state = "Live tracking enabled" if crop is not None and tracking else ("Live pixels enabled" if crop is not None else "Static sprite")
         self.status.setText(f"Released object #{sprite.actor_id}. {state}; drag it across windows.")
 
     def _extract_failed(self, job: ExtractionJob, error: str):
@@ -327,36 +343,38 @@ class ControlPanel(QWidget):
             ])
 
     def _update_live(self, now: float) -> None:
-        """Sample one unobscured source ROI off the GUI thread every ~125 ms."""
+        """Sample visible pixels off the GUI thread, optionally following an object."""
         future = self._live_future
         if future is not None:
             if not future.done():
                 return
             self._live_future = None
             try:
-                actor_id, frame = future.result()
+                actor_id, frame, new_crop = future.result()
             except Exception:
-                pass  # An unavailable, clipped or occluded source freezes its last good frame.
+                pass  # Keep the last frame when the source is unavailable.
             else:
-                entry = self._live_sources.get(actor_id)
-                if entry is not None:
-                    entry[0].update_picture(frame)
+                binding = self._live_sources.get(actor_id)
+                if binding is not None and frame is not None:
+                    binding.sprite.update_picture(frame)
+                    if new_crop is not None:
+                        binding.crop = new_crop
         if now - self._last_live < 0.125 or not self._live_sources:
             return
         self._last_live = now
         entries = list(self._live_sources.items())
         for step in range(len(entries)):
             index = (self._live_cursor + step) % len(entries)
-            actor_id, (sprite, source, matte) = entries[index]
-            window = self._known_windows.get(source.window_id)
+            actor_id, binding = entries[index]
+            window = self._known_windows.get(binding.crop.window_id)
             if window is None:
                 continue
             try:
-                region = source.bounds(window)
+                region = tracking_region(binding.crop, window) if binding.tracking else binding.crop.bounds(window)
             except ValueError:
                 continue
-            # Capture APIs sample *visible pixels*. Do not feed our own overlays
-            # or the control panel back into a sprite's animation.
+            # Live capture samples visible screen pixels, not process memory.
+            # Our own actors/panel must not be painted into their source sample.
             if any(overlaps(region, obj.state.bounds) for obj in self.sprites):
                 continue
             if self.isVisible() and overlaps(region, Rect(
@@ -366,14 +384,36 @@ class ControlPanel(QWidget):
                 continue
             self._live_cursor = (index + 1) % len(entries)
             self._live_future = self._live_executor.submit(
-                self._sample_live, actor_id, region, matte
+                self._sample_live, actor_id, region, binding.crop,
+                binding.matte, binding.tracking, window,
             )
             return
 
     @staticmethod
-    def _sample_live(actor_id: int, region: Rect, matte: Image.Image) -> tuple[int, Image.Image]:
+    def _sample_live(
+        actor_id: int,
+        region: Rect,
+        crop: SourceCrop,
+        matte: Image.Image,
+        tracking: bool,
+        window: AppWindow,
+    ) -> tuple[int, Image.Image | None, SourceCrop | None]:
         shot = capture_region(region, exact=True)
-        return actor_id, composite_live_frame(shot.image, matte)
+        if not tracking:
+            return actor_id, composite_live_frame(shot.image, matte), None
+        found = locate_object(shot.image, matte)
+        if found is None:
+            return actor_id, None, None
+        new_crop = SourceCrop(
+            crop.window_id,
+            round(region.x + found.x - window.bounds.x),
+            round(region.y + found.y - window.bounds.y),
+            crop.width, crop.height,
+        )
+        # The search region was bounded to the same original window.
+        new_crop.bounds(window)
+        frame = shot.image.crop((found.x, found.y, found.x + crop.width, found.y + crop.height))
+        return actor_id, composite_live_frame(frame, matte), new_crop
 
     def closeEvent(self, event):
         self.timer.stop()

@@ -7,7 +7,7 @@ from PIL import Image
 
 from windowrift.capture import capture_region, clipped_region
 from windowrift.geometry import Rect
-from windowrift.live import MAX_LIVE_PIXELS, SourceCrop, composite_live_frame, overlaps
+from windowrift.live import MAX_LIVE_PIXELS, SourceCrop, composite_live_frame, overlaps, tracking_region
 from windowrift.windows import AppWindow
 
 
@@ -75,3 +75,9 @@ def test_screen_capture_origin_and_live_clipping(monkeypatch):
     assert frame.image.getpixel((0, 0)) == (20, 40, 60)
     with pytest.raises(ValueError, match='partially off-screen'):
         capture_region(Rect(-120, 10, 40, 30), exact=True)
+
+
+def test_tracking_region_stays_within_source_window():
+    w = AppWindow(4, "Game", Rect(200, 100, 420, 260))
+    assert tracking_region(SourceCrop(4, 0, 0, 40, 50), w) == Rect(200, 100, 112, 122)
+    assert tracking_region(SourceCrop(4, 350, 220, 60, 40), w) == Rect(478, 248, 142, 112)

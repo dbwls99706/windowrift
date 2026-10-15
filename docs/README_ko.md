@@ -75,3 +75,26 @@ GUI와 실제 게임, 다양한 디스플레이 배율에 대한 완전한 자�
 기본적으로 이미지는 외부 서버로 전송하지 않으며, 로컬 브리지는 `127.0.0.1`에서 세션 토큰을 요구한다. 선택적 AI 모델은 첫 설치 때 다운로드가 필요할 수 있다.
 
 라이선스는 [MIT](../LICENSE)이다.
+
+
+## v0.3.0 실제 게임 데모
+
+[실제 X11 실행 화면](media/actual-x11-demo.png)에서는 직접 제작한 Rift Arcade 게임 창,
+실제 캡처 이미지에서 분리한 별도 투명 객체 창, Chromium의 충돌 횟수 변경을 확인할 수 있다.
+이 이미지는 Xvfb에서 실행한 실제 GUI 화면의 **크롭된 캡처**이며 합성 이미지가 아니다.
+해당 시연은 환경상 PySide6를 실행할 수 없어 `examples/x11_proof.py` 검증 프로그램으로
+수행했다. 주 애플리케이션의 Windows 및 Linux Qt GUI 통합 검증 결과로 간주하면 안 된다.
+
+Rift Arcade를 실행하려면 `python examples/rift_arcade.py`를 사용한다. 화살표로
+이동하고, 스페이스로 점프하며, R로 초기화할 수 있는 실제 게임이다. 별도 터미널에서
+`windowrift`를 실행하고 Rift Arcade 창을 선택한 뒤 **Pixel art / flat background
+color key**를 사용하면 어두운 단색 배경을 쉽게 제거할 수 있다.
+
+새로운 **Track motion** 옵션은 Live pixels를 활성화한 경우 원래 선택한 객체를
+기준으로 최대 72픽셀의 주변 영역에서 매번 객체를 다시 찾는다. 객체가 빠르게
+움직이거나 가려지는 경우 추적을 보장하지 않으며 마지막 정상 프레임을 유지한다.
+
+브라우저의 `examples/browser-lab.html`에서는 이제 확장 프로그램 설치 없이도
+WindowRift 세션 토큰을 입력하여 **Connect local lab** 버튼으로 연결할 수 있다.
+세션 토큰은 URL이나 디스크에 저장하지 않는다. 일반 웹페이지에는 기존 Chrome
+확장 프로그램을 사용하는 방식이 필요하다.

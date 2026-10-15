@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import platform
 import re
+import shutil
 import subprocess
 from dataclasses import dataclass
 
@@ -38,11 +39,69 @@ def _command(*args: str) -> str:
     return proc.stdout.strip()
 
 
+def parse_wmctrl_geometry(output: str) -> list[AppWindow]:
+    """Parse `wmctrl -lG` with spaces and non-ASCII titles preserved."""
+    windows: list[AppWindow] = []
+    for line in output.splitlines():
+        fields = line.split(None, 7)
+        if len(fields) != 8:
+            continue
+        raw_id, _desktop, raw_x, raw_y, raw_w, raw_h, _host, title = fields
+        try:
+            wid = int(raw_id, 16)
+            rect = Rect(float(raw_x), float(raw_y), float(raw_w), float(raw_h))
+        except ValueError:
+            continue
+        if title and not title.startswith("WindowRift") and rect.width >= 100 and rect.height >= 80:
+            windows.append(AppWindow(wid, title, rect))
+    return windows
+
+
+def _x11_xwininfo_windows() -> list[AppWindow]:
+    """Fallback for minimal X11 environments without working window utilities."""
+    listing = _command("xprop", "-root", "_NET_CLIENT_LIST")
+    ids = re.findall(r"0x[0-9a-fA-F]+", listing)
+    result: list[AppWindow] = []
+    for ident in ids:
+        stats = _command("xwininfo", "-id", ident, "-stats")
+        title_match = re.search(r'^xwininfo: Window id: 0x[0-9a-fA-F]+ "([^"]+)"', stats, re.M)
+        if not title_match:
+            continue
+        title = title_match.group(1)
+        if title.startswith("WindowRift") or "Map State: IsViewable" not in stats:
+            continue
+        fields = {}
+        for key, pattern in {
+            "x": r"Absolute upper-left X:\s*(-?\d+)",
+            "y": r"Absolute upper-left Y:\s*(-?\d+)",
+            "width": r"Width:\s*(\d+)",
+            "height": r"Height:\s*(\d+)",
+        }.items():
+            found = re.search(pattern, stats)
+            if found is None:
+                break
+            fields[key] = float(found.group(1))
+        if len(fields) != 4 or fields["width"] < 100 or fields["height"] < 80:
+            continue
+        result.append(AppWindow(int(ident, 16), title, Rect(**fields)))
+    return result
+
+
 def _x11_windows() -> list[AppWindow]:
     if not os.environ.get("DISPLAY"):
-        raise WindowDiscoveryError(
-            "No X11 DISPLAY found. WindowRift v0.1 supports Linux X11, not Wayland."
-        )
+        raise WindowDiscoveryError("No X11 DISPLAY. WindowRift supports Linux X11, not Wayland.")
+    # One wmctrl query is significantly cheaper than one xdotool subprocess
+    # for each visible window, and works even when xdotool is not installed.
+    if shutil.which("wmctrl"):
+        listing = _command("wmctrl", "-lG")
+        if listing:
+            return parse_wmctrl_geometry(listing)
+    if shutil.which("xprop") and shutil.which("xwininfo"):
+        windows = _x11_xwininfo_windows()
+        if windows:
+            return windows
+    if not shutil.which("xdotool"):
+        raise WindowDiscoveryError("No supported X11 window discovery tool returned visible windows.")
     ids = _command("xdotool", "search", "--onlyvisible", "--name", ".")
     result: list[AppWindow] = []
     for raw in ids.splitlines():
@@ -126,4 +185,7 @@ def activate_window(window: AppWindow) -> None:
         import ctypes
         ctypes.windll.user32.SetForegroundWindow(window.wid)
     else:
-        _command("xdotool", "windowactivate", "--sync", str(window.wid))
+        if shutil.which("xdotool"):
+            _command("xdotool", "windowactivate", "--sync", str(window.wid))
+        elif shutil.which("wmctrl"):
+            _command("wmctrl", "-ia", hex(window.wid))

@@ -1,8 +1,11 @@
+from windowrift.geometry import Rect
 from windowrift.windows import _x11_windows
 
 
 def test_x11_window_discovery_excludes_own_panel_and_small_children(monkeypatch):
     monkeypatch.setenv('DISPLAY', ':12')
+    monkeypatch.setattr('windowrift.windows.shutil.which',
+                        lambda name: None if name in ('wmctrl', 'xprop', 'xwininfo') else '/usr/bin/xdotool')
 
     def fake_command(*args):
         if args[1] == 'search':
@@ -24,3 +27,27 @@ def test_x11_window_discovery_excludes_own_panel_and_small_children(monkeypatch)
     assert len(windows) == 1
     assert windows[0].title == 'Sample Game'
     assert windows[0].bounds.y == 60
+
+
+def test_parse_wmctrl_geometry_handles_titles_and_bad_lines():
+    from windowrift.windows import parse_wmctrl_geometry
+    windows = parse_wmctrl_geometry(
+        '0x04800001  0  40  55  780  620 host Rift Arcade | Level 1\n'
+        'invalid line\n'
+        '0x04800004  0 -20  85  340  300 host Paint: 그림판\n'
+        '0x04800005  0  10  15  340  300 host WindowRift | Control\n'
+    )
+    assert [(w.wid, w.title, w.bounds.x) for w in windows] == [
+        (0x04800001, 'Rift Arcade | Level 1', 40.0),
+        (0x04800004, 'Paint: 그림판', -20.0),
+    ]
+
+
+def test_xwininfo_geometry_extraction(monkeypatch):
+    from windowrift.windows import _x11_xwininfo_windows, AppWindow
+    def fake(*args):
+        if args[0] == 'xprop':
+            return '_NET_CLIENT_LIST(WINDOW): window id # 0x40002c'
+        return ('xwininfo: Window id: 0x40002c "Rift Arcade - Demo"\nAbsolute upper-left X: 65\nAbsolute upper-left Y: 110\nWidth: 760\nHeight: 600\nMap State: IsViewable\n')
+    monkeypatch.setattr('windowrift.windows._command',fake)
+    assert _x11_xwininfo_windows() == [AppWindow(0x40002c,'Rift Arcade - Demo', Rect(65,110,760,600))]

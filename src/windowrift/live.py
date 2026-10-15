@@ -66,3 +66,20 @@ def composite_live_frame(frame: Image.Image, matte: Image.Image) -> Image.Image:
     result = frame.convert("RGBA")
     result.putalpha(matte.convert("RGBA").getchannel("A"))
     return result
+
+
+TRACKING_RADIUS = 72
+
+
+def tracking_region(source: SourceCrop, window: AppWindow, radius: int = TRACKING_RADIUS) -> Rect:
+    """Limit a neighborhood search to the source window's bounds.
+
+    Never track pixels that belong to another application window by expanding
+    outside the original source. This does not detect overlapping windows.
+    """
+    current = source.bounds(window)
+    left = max(round(window.bounds.x), round(current.x) - radius)
+    top = max(round(window.bounds.y), round(current.y) - radius)
+    right = min(round(window.bounds.right), round(current.right) + radius)
+    bottom = min(round(window.bounds.bottom), round(current.bottom) + radius)
+    return Rect(left, top, right - left, bottom - top)

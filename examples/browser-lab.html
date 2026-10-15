@@ -2,15 +2,20 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>WindowRift Collision Lab</title>
 <style>
-:root{font-family:system-ui;color-scheme:dark;background:#101927;color:#e8f5fb}body{max-width:950px;margin:60px auto;padding:0 25px}
+:root{font-family:system-ui;color-scheme:dark;background:#101927;color:#e8f5fb}body{max-width:950px;margin:28px auto;padding:0 25px}
 h1{font-size:38px;margin:0;color:#75e4e5}p{color:#a5b8c9;line-height:1.6}.stats{font-size:22px;font-weight:700;margin:26px 0}
 .grid{display:flex;flex-wrap:wrap;gap:25px}.target{border:2px solid #64b9cd;border-radius:15px;background:#263b4d;padding:30px 25px;min-width:150px;min-height:90px;display:grid;place-items:center;box-shadow:0 14px 30px #0005}
 .target strong{font-size:20px}.target:hover{border-color:#c0ff6c}.effect{margin-top:30px;padding:18px;background:#1b2c3d;border-radius:8px}
-.blink{width:24px;height:24px;background:#80f7ca;display:inline-block;animation:blink .8s steps(1) infinite alternate;margin:10px}
+.connect{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:20px 0}.connect input{background:#243349;color:#e4f3ff;border:1px solid #517487;padding:10px;border-radius:7px;min-width:240px}.connect button{background:#6fe2d9;color:#102333;border:0;border-radius:7px;padding:11px 18px;font-weight:700;cursor:pointer}.connection{font-size:12px;color:#a0c8d8}.blink{width:24px;height:24px;background:#80f7ca;display:inline-block;animation:blink .8s steps(1) infinite alternate;margin:10px}
 @keyframes blink{from{opacity:1}to{opacity:.15}}
 </style></head><body>
 <h1>WindowRift Collision Lab</h1>
-<p>Open WindowRift and release a sprite. Enable this tab using the optional Chrome extension, then drag the sprite over one of the boxes. The page reacts to a real DOM event on first entry. Reset in the extension to undo visual transforms.</p>
+<p>Run WindowRift and release a sprite. Connect this local lab using the session token, or enable the Chrome extension. Drag the sprite into a box: this page updates its own DOM state on impact.</p>
+<div class="connect" id="direct-connect">
+  <input id="token" type="password" placeholder="Paste session token" autocomplete="off" aria-label="Session token">
+  <button id="connect">Connect local lab</button>
+  <span id="connection" class="connection" role="status">Not connected</span>
+</div>
 <div class="stats">Rift impacts: <span id="impacts">0</span> <span class="blink" aria-label="Animated reference"></span></div>
 <div class="grid">
   <div class="target" data-windowrift-target><strong>Crystal</strong><span id="crystal-count">0 impacts</span></div>
@@ -24,6 +29,9 @@ const labels=['crystal-count','portal-count','power-count'];
 for(const [index,element] of [...document.querySelectorAll('[data-windowrift-target]')].entries()) {
   let count=0;
   element.addEventListener('windowrift:impact', event=>{
+    const firstTransform = element.dataset.impactTransform || '';
+    element.style.transition = 'transform 430ms cubic-bezier(.2,.8,.2,1)';
+    element.style.transform = `${firstTransform} translateY(8px) rotate(${index % 2 ? 6 : -6}deg)`;
     count+=1;
     total+=1;
     document.getElementById('impacts').textContent=String(total);
@@ -31,5 +39,54 @@ for(const [index,element] of [...document.querySelectorAll('[data-windowrift-tar
     document.getElementById('log').textContent=`Actor ${event.detail.id} entered ${element.querySelector('strong').textContent}. This is a real page-state update.`;
   });
 }
+
+// An opt-in local demo path for browsers that do not have the extension.
+// No token is put in the URL or written to disk; the bridge binds to loopback.
+let directSocket = null;
+const previouslyInside = new Map();
+function browserViewportOrigin() {
+  const side = Math.max(0, (window.outerWidth - window.innerWidth) / 2);
+  return { x: window.screenX + side, y: window.screenY + window.outerHeight - window.innerHeight - side };
+}
+function handleActors(actors) {
+  const origin = browserViewportOrigin();
+  const targets = [...document.querySelectorAll('[data-windowrift-target]')];
+  const ids = new Set();
+  for (const actor of actors.slice(0, 128)) {
+    if (!Number.isInteger(actor.id) || ![actor.x, actor.y, actor.width, actor.height].every(Number.isFinite)) continue;
+    if (actor.width <= 0 || actor.height <= 0) continue;
+    const x = actor.x + actor.width / 2 - origin.x;
+    const y = actor.y + actor.height / 2 - origin.y;
+    const next = targets.find(el => {
+      const r = el.getBoundingClientRect();
+      return x >= r.left && x < r.right && y >= r.top && y < r.bottom;
+    }) || null;
+    ids.add(actor.id);
+    if (next && previouslyInside.get(actor.id) !== next) {
+      next.dispatchEvent(new CustomEvent('windowrift:impact', {
+        bubbles:true, detail:{id:actor.id,x:actor.x,y:actor.y}
+      }));
+    }
+    previouslyInside.set(actor.id, next);
+  }
+  for (const id of previouslyInside.keys()) if (!ids.has(id)) previouslyInside.delete(id);
+}
+document.getElementById('connect').addEventListener('click', () => {
+  const token = document.getElementById('token').value.trim();
+  const status = document.getElementById('connection');
+  if (!token) {status.textContent = 'Paste a session token first.'; return;}
+  if (directSocket) directSocket.close();
+  const ws = new WebSocket(`ws://127.0.0.1:8765/?token=${encodeURIComponent(token)}`);
+  directSocket = ws;
+  ws.onopen = () => {status.textContent = 'Connected to WindowRift'; document.getElementById('token').value = '';};
+  ws.onerror = () => {status.textContent = 'Could not connect. Is WindowRift running?';};
+  ws.onclose = () => {if (directSocket === ws) status.textContent = 'Disconnected';};
+  ws.onmessage = event => {
+    try {
+      const message = JSON.parse(event.data);
+      if (message.type === 'actors' && Array.isArray(message.actors)) handleActors(message.actors);
+    } catch (_) { /* Ignore malformed local messages. */ }
+  };
+});
 </script>
 </body></html>

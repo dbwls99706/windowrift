@@ -4,11 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "windowrift-desktop"
-version = "0.2.0"
+version = "0.3.0"
 description = "Pull objects out of application windows and let them interact with your desktop and browser."
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "MIT" }
+license = "MIT"
 authors = [{ name = "dbwls99706" }]
 keywords = ["desktop", "overlay", "computer-vision", "segmentation", "browser-extension", "x11"]
 dependencies = [
