@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WindowRift Collision Lab</title>
+<style>
+:root{font-family:system-ui;color-scheme:dark;background:#101927;color:#e8f5fb}body{max-width:950px;margin:60px auto;padding:0 25px}
+h1{font-size:38px;margin:0;color:#75e4e5}p{color:#a5b8c9;line-height:1.6}.stats{font-size:22px;font-weight:700;margin:26px 0}
+.grid{display:flex;flex-wrap:wrap;gap:25px}.target{border:2px solid #64b9cd;border-radius:15px;background:#263b4d;padding:30px 25px;min-width:150px;min-height:90px;display:grid;place-items:center;box-shadow:0 14px 30px #0005}
+.target strong{font-size:20px}.target:hover{border-color:#c0ff6c}.effect{margin-top:30px;padding:18px;background:#1b2c3d;border-radius:8px}
+.blink{width:24px;height:24px;background:#80f7ca;display:inline-block;animation:blink .8s steps(1) infinite alternate;margin:10px}
+@keyframes blink{from{opacity:1}to{opacity:.15}}
+</style></head><body>
+<h1>WindowRift Collision Lab</h1>
+<p>Open WindowRift and release a sprite. Enable this tab using the optional Chrome extension, then drag the sprite over one of the boxes. The page reacts to a real DOM event on first entry. Reset in the extension to undo visual transforms.</p>
+<div class="stats">Rift impacts: <span id="impacts">0</span> <span class="blink" aria-label="Animated reference"></span></div>
+<div class="grid">
+  <div class="target" data-windowrift-target><strong>Crystal</strong><span id="crystal-count">0 impacts</span></div>
+  <div class="target" data-windowrift-target><strong>Portal</strong><span id="portal-count">0 impacts</span></div>
+  <div class="target" data-windowrift-target><strong>Power Core</strong><span id="power-count">0 impacts</span></div>
+</div>
+<p class="effect" id="log" role="status">No impacts yet. Nothing on this page is connected to an external service.</p>
+<script>
+let total=0;
+const labels=['crystal-count','portal-count','power-count'];
+for(const [index,element] of [...document.querySelectorAll('[data-windowrift-target]')].entries()) {
+  let count=0;
+  element.addEventListener('windowrift:impact', event=>{
+    count+=1;
+    total+=1;
+    document.getElementById('impacts').textContent=String(total);
+    document.getElementById(labels[index]).textContent=`${count} impacts`;
+    document.getElementById('log').textContent=`Actor ${event.detail.id} entered ${element.querySelector('strong').textContent}. This is a real page-state update.`;
+  });
+}
+</script>
+</body></html>

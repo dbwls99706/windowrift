@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "windowrift-desktop"
+version = "0.2.0"
+description = "Pull objects out of application windows and let them interact with your desktop and browser."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "dbwls99706" }]
+keywords = ["desktop", "overlay", "computer-vision", "segmentation", "browser-extension", "x11"]
+dependencies = [
+  "PySide6>=6.7,<7",
+  "mss>=9,<11",
+  "Pillow>=10,<13",
+  "numpy>=1.26,<3",
+  "opencv-python-headless>=4.8,<5",
+  "websockets>=14,<17",
+]
+
+[project.optional-dependencies]
+ai = ["rembg[cpu]>=2.0.65,<3"]
+dev = ["pytest>=8,<10", "ruff>=0.9,<1"]
+
+[project.scripts]
+windowrift = "windowrift.app:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"

@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body{width:285px;background:#151b28;color:#edf7ff;font:13px system-ui;padding:13px;margin:0}
+h2{color:#75e4e5;margin:0 0 9px}p{line-height:1.5;color:#9cabc2}input{box-sizing:border-box;width:100%;background:#263449;border:1px solid #52708a;border-radius:6px;color:white;padding:9px}
+button{padding:9px 10px;border:0;border-radius:6px;cursor:pointer;background:#169ca5;color:white;margin-top:10px}
+button.secondary{background:#394a62}#status{min-height:36px;display:block;color:#9eb3cc}
+</style></head><body>
+<h2>WindowRift</h2>
+<p>Paste the session token from the desktop control panel. Enable each page explicitly.</p>
+<label>Session token<input id="token" type="password" placeholder="Paste token"></label>
+<button id="enable">Enable this tab</button> <button id="reset" class="secondary">Reset page</button>
+<p id="status"></p>
+<script src="popup.js"></script>
+</body></html>
