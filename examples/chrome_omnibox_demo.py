@@ -28,6 +28,7 @@ from PIL import Image, ImageGrab, ImageTk
 from windowrift.omnibox import OmniboxCalibration, looks_like_chrome, portal_position
 from windowrift.demo_handoff import request_handoff
 from windowrift.segmentation import SegmentationError, extract_object
+from windowrift.doom_wad import doom_patch_sprite
 from windowrift.windows import AppWindow, list_windows
 
 
@@ -145,6 +146,8 @@ class LiveOmniboxDemo:
         self.last_windows = 0.0
         self.photo = None
         self.sprite_size = (args.actor_height, args.actor_height)
+        self.wad_sprite = (doom_patch_sprite(args.doom_wad, args.doom_lump)
+                           if args.doom_wad is not None else None)
         self.root.withdraw()
         self.window = tk.Toplevel(root)
         self.window.title("WindowRift: chrome omnibox actor")
@@ -162,6 +165,8 @@ class LiveOmniboxDemo:
         self.root.protocol("WM_DELETE_WINDOW", self.close)
 
     def refresh_frame(self, *, force=False) -> None:
+        if self.wad_sprite is not None and self.last_frame > 0:
+            return  # The WAD patch is a static image, not a live capture.
         if self.game_lifted and not force:
             return  # The opted-in source game intentionally hides its sprite.
         if not force and time.monotonic() - self.last_frame < 0.13:
@@ -170,12 +175,17 @@ class LiveOmniboxDemo:
         x, y, width, height = self.args.crop
         left = round(self.source.bounds.x) + x
         top = round(self.source.bounds.y) + y
-        image = ImageGrab.grab(bbox=(left, top, left + width, top + height),
-                              xdisplay=os.environ.get("DISPLAY"))
-        try:
-            sprite = extract_object(image, self.args.mode)
-        except SegmentationError:
-            return  # Source temporarily occluded or visually changed.
+        if self.wad_sprite is not None:
+            sprite = self.wad_sprite
+            self.original_start = (self.source.bounds.x + self.source.bounds.width / 2,
+                                   self.source.bounds.y + self.source.bounds.height / 2)
+        else:
+            image = ImageGrab.grab(bbox=(left, top, left + width, top + height),
+                                  xdisplay=os.environ.get("DISPLAY"))
+            try:
+                sprite = extract_object(image, self.args.mode)
+            except SegmentationError:
+                return  # Source temporarily occluded or visually changed.
         if max(sprite.size) > 0:
             target_height = self.args.actor_height
             target_width = max(12, round(sprite.width * target_height / sprite.height))
@@ -277,6 +287,10 @@ def cli_args() -> argparse.Namespace:
                         help="Object crop relative to game window: x,y,width,height")
     parser.add_argument("--mode", choices=("color-key", "grabcut", "ai"), default="color-key")
     parser.add_argument("--actor-height", type=int, default=34)
+    parser.add_argument("--doom-wad", type=Path, default=None,
+                        help="Optional user-supplied DOOM IWAD for genuine game sprite demo (no game state transfer)")
+    parser.add_argument("--doom-lump", default="TROOA1",
+                        help="DOOM sprite patch lump, default TROOA1 (Imp)")
     parser.add_argument("--left", type=int, default=122)
     parser.add_argument("--top", type=int, default=47)
     parser.add_argument("--right", type=int, default=87)
@@ -293,6 +307,8 @@ def cli_args() -> argparse.Namespace:
     args._saved = False
     if not 20 <= args.actor_height <= 70 or args.travel <= 0:
         parser.error("actor-height must be 20–70 and travel must be positive")
+    if args.doom_wad and args.handoff:
+        parser.error("DOOM WAD rendering cannot use the Rift Arcade state handoff")
     if args.handoff and len(args.handoff) < 12:
         parser.error("Demo handoff token must be at least 12 characters")
     return args

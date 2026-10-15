@@ -54,6 +54,24 @@ environment lacked PySide6, the actor was drawn by the included
 not by the production Qt control panel. The original game character remains
 in the running game; no game-memory modifications are claimed.
 
+
+### Real commercial-game test: original DOOM shareware
+
+[**Runbook and provenance**](docs/DOOM_SHAREWARE.md). A separate GitHub Actions
+workflow runs **Chocolate Doom with the unmodified id Software Doom 1.9
+shareware game data**, and launches an independent Chrome window on X11.
+It decodes the genuine `TROOA1` sprite patch from the caller-supplied (or
+CI-downloaded) WAD and displays that sprite as an input-transparent native
+window over Chrome's real address bar. The archive is checksum-checked at
+runtime, and **is not committed, bundled or uploaded as an artifact**.
+
+This is a **read-only asset-assisted demonstration with a real commercial-game
+engine**. It is *not* generic game-state extraction, live Imp tracking,
+Minecraft modding, or a claim that Doom's in-world actor was removed. The
+workflow publishes a time-limited screenshot and proof manifest only when
+it completes successfully. Do not describe a scheduled or failed CI run
+as a completed commercial-game experiment.
+
 ## Features
 
 | Feature | Behavior |
