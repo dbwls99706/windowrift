@@ -39,6 +39,20 @@ def _command(*args: str) -> str:
     return proc.stdout.strip()
 
 
+
+def _is_own_window_title(title: str) -> bool:
+    """Ignore only our desktop windows, not pages about WindowRift in Chrome.
+
+    Browser tab titles can start with ``WindowRift`` (e.g. the real Collision
+    Lab tab). A blanket prefix check silently hid Chrome from discovery.
+    """
+    return title.startswith((
+        "WindowRift | Control",
+        "WindowRift: chrome omnibox actor",
+        "WindowRift cinematic native actor",
+    ))
+
+
 def parse_wmctrl_geometry(output: str) -> list[AppWindow]:
     """Parse `wmctrl -lG` with spaces and non-ASCII titles preserved."""
     windows: list[AppWindow] = []
@@ -52,7 +66,7 @@ def parse_wmctrl_geometry(output: str) -> list[AppWindow]:
             rect = Rect(float(raw_x), float(raw_y), float(raw_w), float(raw_h))
         except ValueError:
             continue
-        if title and not title.startswith("WindowRift") and rect.width >= 100 and rect.height >= 80:
+        if title and not _is_own_window_title(title) and rect.width >= 100 and rect.height >= 80:
             windows.append(AppWindow(wid, title, rect))
     return windows
 
@@ -68,7 +82,7 @@ def _x11_xwininfo_windows() -> list[AppWindow]:
         if not title_match:
             continue
         title = title_match.group(1)
-        if title.startswith("WindowRift") or "Map State: IsViewable" not in stats:
+        if _is_own_window_title(title) or "Map State: IsViewable" not in stats:
             continue
         fields = {}
         for key, pattern in {
@@ -110,7 +124,7 @@ def _x11_windows() -> list[AppWindow]:
         except ValueError:
             continue
         title = _command("xdotool", "getwindowname", str(wid))
-        if not title.strip() or title.startswith("WindowRift"):
+        if not title.strip() or _is_own_window_title(title):
             continue
         fields = dict(re.findall(r"^(X|Y|WIDTH|HEIGHT)=(-?\d+)$", _command(
             "xdotool", "getwindowgeometry", "--shell", str(wid)

@@ -51,3 +51,38 @@ def test_xwininfo_geometry_extraction(monkeypatch):
         return ('xwininfo: Window id: 0x40002c "Rift Arcade - Demo"\nAbsolute upper-left X: 65\nAbsolute upper-left Y: 110\nWidth: 760\nHeight: 600\nMap State: IsViewable\n')
     monkeypatch.setattr('windowrift.windows._command',fake)
     assert _x11_xwininfo_windows() == [AppWindow(0x40002c,'Rift Arcade - Demo', Rect(65,110,760,600))]
+
+
+def test_chrome_tab_with_windowrift_prefix_is_not_hidden():
+    from windowrift.windows import parse_wmctrl_geometry
+    from windowrift.omnibox import looks_like_chrome
+    listing = (
+        "0x00600002  0  825  90  735  680  host WindowRift Collision Lab - Google Chrome\n"
+        "0x00400002  0  25  90  760  680  host Minecraft Classic - Google Chrome\n"
+        "0x00800002  0  25  90  760  680  host WindowRift | Control\n"
+        "0x00800003  0  25  90  760  680  host WindowRift cinematic native actor\n"
+    )
+    visible = parse_wmctrl_geometry(listing)
+    assert len(visible) == 2
+    assert {w.title for w in visible} == {
+        "WindowRift Collision Lab - Google Chrome",
+        "Minecraft Classic - Google Chrome",
+    }
+    assert all(looks_like_chrome(w) for w in visible)
+
+
+def test_xwininfo_keeps_windowrift_browser_title(monkeypatch):
+    from windowrift.windows import _x11_xwininfo_windows
+
+    def fake(*args):
+        if args[0] == "xprop":
+            return "_NET_CLIENT_LIST(WINDOW): window id # 0x40002c"
+        return (
+            'xwininfo: Window id: 0x40002c "WindowRift Collision Lab - Google Chrome"\n'
+            'Absolute upper-left X: 825\nAbsolute upper-left Y: 90\n'
+            'Width: 735\nHeight: 680\nMap State: IsViewable\n'
+        )
+    monkeypatch.setattr("windowrift.windows._command", fake)
+    assert [w.title for w in _x11_xwininfo_windows()] == [
+        "WindowRift Collision Lab - Google Chrome"
+    ]

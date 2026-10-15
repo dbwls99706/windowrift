@@ -6,6 +6,8 @@ on:
       - 'scripts/ci/minecraft-classic.sh'
       - 'scripts/ci/minecraft_check.py'
       - 'examples/cinematic_omnibox_demo.py'
+      - 'src/windowrift/windows.py'
+      - 'examples/chrome_omnibox_demo.py'
   workflow_dispatch:
 permissions:
   contents: read
