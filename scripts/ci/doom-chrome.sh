@@ -69,10 +69,24 @@ python examples/cinematic_omnibox_demo.py \
   --target-file artifacts/browser-target.json \
   --screenshot artifacts/doom-chrome.png \
   --gif artifacts/doom-chrome.gif >artifacts/portal.log 2>&1 & demo_pid=$!
-sleep 0.8
-# The page may have tried to connect before the native bridge started. Reconnect.
-python scripts/ci/browser_probe.py --port 9222 --token "$WINDOWRIFT_BRIDGE_TOKEN" \
-  --target-file artifacts/browser-target.json >>artifacts/probe.log 2>&1
+# Wait for the actual bridge handshake rather than assuming 0.8 seconds is
+# sufficient to decode the original game assets and start the event listener.
+for i in $(seq 1 60); do
+  if grep -q 'BROWSER_BRIDGE_READY=' artifacts/portal.log; then break; fi
+  if ! kill -0 "$demo_pid" 2>/dev/null; then cat artifacts/portal.log; exit 1; fi
+  sleep 0.10
+done
+grep -q 'BROWSER_BRIDGE_READY=' artifacts/portal.log || {
+  cat artifacts/portal.log; echo 'Browser bridge never started'; exit 1;
+}
+connected=0
+for i in $(seq 1 5); do
+  if python scripts/ci/browser_probe.py --port 9222 --token "$WINDOWRIFT_BRIDGE_TOKEN" \
+    --target-file artifacts/browser-target.json --wait-connected \
+      >>artifacts/probe.log 2>&1; then connected=1; break; fi
+  sleep 0.15
+done
+if [[ "$connected" != 1 ]]; then tail -n 40 artifacts/probe.log; exit 1; fi
 wait "$demo_pid" || { cat artifacts/portal.log; exit 1; }
 demo_pid=""
 python scripts/ci/browser_probe.py --port 9222 --check | tee artifacts/browser-impact.log

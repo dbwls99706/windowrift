@@ -49,6 +49,7 @@ class NativeDemo:
         self.bridge.start()
         if self.bridge.error:
             raise RuntimeError(self.bridge.error)
+        print('BROWSER_BRIDGE_READY=127.0.0.1', flush=True)
         self.recorder = ProofRecorder(interval=0.17, max_frames=75)
         self.box = max(80, int(args.actor_height * 1.65))
         root.withdraw()

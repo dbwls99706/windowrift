@@ -49,14 +49,29 @@ test -s artifacts/minecraft/browser-target.json || { cat artifacts/minecraft/pro
 # Do not claim internal block state is removed or altered by the overlay.
 python examples/cinematic_omnibox_demo.py \
   --source-title 'Minecraft Classic' --browser-title 'WindowRift Collision Lab' \
-  --crop 270,260,145,145 --mode grabcut \
+  --crop 290,636,36,40 --mode grabcut \
   --token "$WINDOWRIFT_BRIDGE_TOKEN" \
   --target-file artifacts/minecraft/browser-target.json \
   --gif artifacts/minecraft/minecraft-chrome.gif \
   --screenshot artifacts/minecraft/minecraft-impact.png >artifacts/minecraft/portal.log 2>&1 & demopid=$!
-sleep 0.8
-python scripts/ci/browser_probe.py --port 9222 --token "$WINDOWRIFT_BRIDGE_TOKEN" \
-  --target-file artifacts/minecraft/browser-target.json >>artifacts/minecraft/probe.log 2>&1
+# The original game crop may take longer than 0.8 seconds to segment.
+# Wait until the native overlay's WebSocket server is ready before connecting.
+for i in $(seq 1 60); do
+  if grep -q 'BROWSER_BRIDGE_READY=' artifacts/minecraft/portal.log; then break; fi
+  if ! kill -0 "$demopid" 2>/dev/null; then cat artifacts/minecraft/portal.log; exit 1; fi
+  sleep 0.10
+done
+grep -q 'BROWSER_BRIDGE_READY=' artifacts/minecraft/portal.log || {
+  cat artifacts/minecraft/portal.log; echo 'Browser bridge never started'; exit 1;
+}
+connected=0
+for i in $(seq 1 5); do
+  if python scripts/ci/browser_probe.py --port 9222 --token "$WINDOWRIFT_BRIDGE_TOKEN" \
+    --target-file artifacts/minecraft/browser-target.json --wait-connected \
+      >>artifacts/minecraft/probe.log 2>&1; then connected=1; break; fi
+  sleep 0.15
+done
+if [[ "$connected" != 1 ]]; then tail -n 40 artifacts/minecraft/probe.log; exit 1; fi
 wait "$demopid" || { cat artifacts/minecraft/portal.log; exit 1; }
 demopid=""
 python scripts/ci/browser_probe.py --port 9222 --check | tee artifacts/minecraft/impact.log

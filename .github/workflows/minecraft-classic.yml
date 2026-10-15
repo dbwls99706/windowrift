@@ -8,6 +8,7 @@ on:
       - 'examples/cinematic_omnibox_demo.py'
       - 'src/windowrift/windows.py'
       - 'examples/chrome_omnibox_demo.py'
+      - 'scripts/ci/browser_probe.py'
   workflow_dispatch:
 permissions:
   contents: read
