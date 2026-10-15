@@ -65,6 +65,15 @@ CI-downloaded) WAD and displays that sprite as an input-transparent native
 window over Chrome's real address bar. The archive is checksum-checked at
 runtime, and **is not committed, bundled or uploaded as an artifact**.
 
+![Original DOOM shareware running next to real Chrome; the TROOA1 Imp sprite from
+its WAD is a separate click-through X11 window above Chrome's real address bar.](docs/media/doom-shareware-chrome-x11.png)
+
+Screenshot from [verified game integration CI](https://github.com/dbwls99706/windowrift/actions/runs/38692731397),
+not a drawing or a reconstruction. The original DOOM engine was actually
+running; the displayed Imp is a WAD-sourced independent overlay, not a
+removed in-world enemy. The newer workflow additionally records an animated
+X11 screen-capture GIF when it succeeds.
+
 This is a **read-only asset-assisted demonstration with a real commercial-game
 engine**. It is *not* generic game-state extraction, live Imp tracking,
 Minecraft modding, or a claim that Doom's in-world actor was removed. The

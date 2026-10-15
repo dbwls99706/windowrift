@@ -18,7 +18,7 @@ or a CI upload artifact. Do not treat the WAD's shareware terms as an MIT licens
    **game-specific asset-assisted adapter**, not AI image extraction.
 5. Move the transparent, mouse-pass-through X11 sprite window from the Doom
    window to the **real** Chrome omnibox region. Preserve keyboard input.
-6. Capture an actual X11 desktop screenshot and a machine-readable proof
+6. Capture an actual X11 desktop screenshot, short recorded GIF, and machine-readable proof
    with the WAD checksum and provenance. Only those limited outputs and logs
    are eligible for the seven-day CI artifact.
 
@@ -31,7 +31,7 @@ complex 3D silhouette extraction, or game-process mutation.
 
 The workflow [commercial-game-demo.yml](../.github/workflows/commercial-game-demo.yml)
 executes on its own integration changes (and is also manually dispatchable).
-**A green workflow with `doom-chrome.png` and `proof.json` is required
+**A green workflow with `doom-chrome.png`, `doom-chrome.gif` and `proof.json` is required
 before claiming a successful live commercial-game run.** If the source-port
 package, browser binary, WAD mirror or display cannot be started, the job
 should fail rather than fake a screenshot.
@@ -66,3 +66,12 @@ repository neither vendors it nor links to its engine. This project
 contains no Doom source, IWAD, patch sprites, extracted lump data, or
 license grant for proprietary game assets. Reuse of screenshots is subject
 to the applicable rights of their owners.
+
+## Verified baseline
+
+The first successful GitHub Actions run is
+[commercial game proof #38692731397](https://github.com/dbwls99706/windowrift/actions/runs/38692731397).
+The original game archive matched the published DOOM 1.9 shareware MD5;
+Chocolate Doom and Chrome ran simultaneously in X11, and the result is
+shown at [this authentic screenshot](media/doom-shareware-chrome-x11.png).
+The verification does not establish an in-game actor state handoff.

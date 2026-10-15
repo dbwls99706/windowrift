@@ -9,3 +9,5 @@ dist/
 *.png
 !docs/*.png
 .DS_Store
+
+!docs/media/*.png

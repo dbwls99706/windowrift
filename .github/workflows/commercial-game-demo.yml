@@ -6,6 +6,7 @@ on:
       - 'scripts/ci/doom-chrome.sh'
       - 'examples/chrome_omnibox_demo.py'
       - 'src/windowrift/doom_wad.py'
+      - 'src/windowrift/proof_capture.py'
       - 'src/windowrift/omnibox.py'
       - 'src/windowrift/windows.py'
       - 'tests/test_doom_wad.py'
@@ -44,6 +45,7 @@ jobs:
           name: doom-shareware-chrome-x11
           path: |
             artifacts/doom-chrome.png
+            artifacts/doom-chrome.gif
             artifacts/proof.json
             artifacts/game.log
             artifacts/portal.log

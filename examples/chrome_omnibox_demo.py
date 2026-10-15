@@ -29,6 +29,7 @@ from windowrift.omnibox import OmniboxCalibration, looks_like_chrome, portal_pos
 from windowrift.demo_handoff import request_handoff
 from windowrift.segmentation import SegmentationError, extract_object
 from windowrift.doom_wad import doom_patch_sprite
+from windowrift.proof_capture import ProofRecorder
 from windowrift.windows import AppWindow, list_windows
 
 
@@ -146,6 +147,7 @@ class LiveOmniboxDemo:
         self.last_windows = 0.0
         self.photo = None
         self.sprite_size = (args.actor_height, args.actor_height)
+        self.recorder = ProofRecorder(interval=args.gif_interval) if args.record_gif else None
         self.wad_sprite = (doom_patch_sprite(args.doom_wad, args.doom_lump)
                            if args.doom_wad is not None else None)
         self.root.withdraw()
@@ -243,6 +245,8 @@ class LiveOmniboxDemo:
             except ValueError:
                 pass
         self.refresh_frame()
+        if self.recorder is not None:
+            self.recorder.add_frame(elapsed, ImageGrab.grab(xdisplay=os.environ.get("DISPLAY")))
         if self.args.screenshot and elapsed >= self.args.screenshot_at and not self.args._saved:
             self.args._saved = True
             self.root.update_idletasks()
@@ -257,6 +261,9 @@ class LiveOmniboxDemo:
         print(f"ACTUAL_DESKTOP_CAPTURE={path}", flush=True)
 
     def close(self) -> None:
+        if self.recorder is not None and self.recorder.frames:
+            count = self.recorder.save(self.args.record_gif)
+            print(f"ACTUAL_DESKTOP_GIF={self.args.record_gif};frames={count}", flush=True)
         if self.game_lifted and self.args.handoff:
             if request_handoff("return", self.args.handoff,
                                port=self.args.handoff_port, timeout=0.4):
@@ -303,10 +310,16 @@ def cli_args() -> argparse.Namespace:
                         help="0 runs until the window is closed")
     parser.add_argument("--screenshot", default=None)
     parser.add_argument("--screenshot-at", type=float, default=3.7)
+    parser.add_argument("--record-gif", default=None,
+                        help="Record bounded frames of the real X11 desktop (no synthetic game renders)")
+    parser.add_argument("--gif-interval", type=float, default=0.2,
+                        help="Desktop capture interval in seconds (0.1-2)")
     args = parser.parse_args()
     args._saved = False
     if not 20 <= args.actor_height <= 70 or args.travel <= 0:
         parser.error("actor-height must be 20–70 and travel must be positive")
+    if args.record_gif and not 0.1 <= args.gif_interval <= 2:
+        parser.error("GIF interval must be 0.1-2 seconds")
     if args.doom_wad and args.handoff:
         parser.error("DOOM WAD rendering cannot use the Rift Arcade state handoff")
     if args.handoff and len(args.handoff) < 12:

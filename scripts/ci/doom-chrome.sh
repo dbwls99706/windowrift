@@ -41,7 +41,7 @@ sleep 2
 timeout 35s python examples/chrome_omnibox_demo.py \
   --source-title Doom --doom-wad "$DOOM_WAD" --doom-lump TROOA1 \
   --actor-height 45 --travel 2 --duration 8 --screenshot-at 5 \
-  --screenshot artifacts/doom-chrome.png > artifacts/portal.log 2>&1 || {
+  --screenshot artifacts/doom-chrome.png --record-gif artifacts/doom-chrome.gif > artifacts/portal.log 2>&1 || {
     cat artifacts/portal.log; exit 1;
   }
 test -s artifacts/doom-chrome.png || { cat artifacts/portal.log; echo 'No captured screenshot'; exit 1; }
@@ -52,6 +52,7 @@ from PIL import Image
 p = Path('artifacts/doom-chrome.png')
 im = Image.open(p).convert('RGB')
 assert im.width >= 1280 and im.height >= 720
+assert Path('artifacts/doom-chrome.gif').stat().st_size > 1000
 # Preserve only hashes and process/provenance evidence, never the WAD itself.
 raw = Path(os.environ['DOOM_WAD']).read_bytes()
 report = {
@@ -59,6 +60,7 @@ report = {
     'original_game': 'id Software Doom Episode 1 (shareware 1.9)',
     'engine': 'Chocolate Doom (Ubuntu package)',
     'image': str(p),
+    'gif': 'artifacts/doom-chrome.gif',
     'image_size': list(im.size),
     'wad_md5': hashlib.md5(raw).hexdigest(),
     'wad_sha256': hashlib.sha256(raw).hexdigest(),
