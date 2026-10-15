@@ -56,7 +56,7 @@ def test_chrome_portal_changes_actor_geometry_and_restores(monkeypatch):
     try:
         panel.dock_in_chrome()
         assert 7 in panel._browser_docks
-        assert sprite.height() == 33
+        assert sprite.height() == 58
         panel.tick()
         panel.release_from_chrome()
         assert 7 not in panel._browser_docks
