@@ -8,7 +8,27 @@ export XDG_RUNTIME_DIR="${RUNNER_TEMP:-/tmp}/wr-doom-runtime"
 mkdir -p "$XDG_RUNTIME_DIR"
 chmod 700 "$XDG_RUNTIME_DIR"
 Xvfb :99 -screen 0 1600x900x24 -nolisten tcp >artifacts/xvfb.log 2>&1 & xvfb_pid=$!
+# Xvfb and the WM are independent asynchronous processes. Starting openbox
+# before the X11 socket is listening can leave EWMH client enumeration absent.
+for i in $(seq 1 40); do
+  if xprop -root >/dev/null 2>&1; then break; fi
+  if ! kill -0 "$xvfb_pid" 2>/dev/null; then
+    echo 'Xvfb exited before accepting clients'; cat artifacts/xvfb.log; exit 1
+  fi
+  sleep 0.25
+done
+xprop -root >/dev/null 2>&1 || { echo 'X11 server never became ready'; exit 1; }
 openbox >artifacts/openbox.log 2>&1 & wm_pid=$!
+for i in $(seq 1 40); do
+  if xprop -root _NET_SUPPORTED 2>/dev/null | grep -q _NET_CLIENT_LIST; then break; fi
+  if ! kill -0 "$wm_pid" 2>/dev/null; then
+    echo 'Window manager exited before EWMH initialization'; cat artifacts/openbox.log; exit 1
+  fi
+  sleep 0.25
+done
+xprop -root _NET_SUPPORTED 2>/dev/null | grep -q _NET_CLIENT_LIST || {
+  echo 'Window manager did not advertise _NET_CLIENT_LIST'; cat artifacts/openbox.log; exit 1
+}
 chrome_pid=""; doom_pid=""
 cleanup() {
   [[ -z "$chrome_pid" ]] || kill "$chrome_pid" 2>/dev/null || true
@@ -16,7 +36,7 @@ cleanup() {
   kill "$wm_pid" "$xvfb_pid" 2>/dev/null || true
 }
 trap cleanup EXIT
-sleep 2
+sleep 1
 chocolate-doom -iwad "$DOOM_WAD" -window -width 640 -height 480 -warp 1 1 -skill 2 -nosound -nomusic >artifacts/game.log 2>&1 & doom_pid=$!
 google-chrome --no-sandbox --disable-gpu --disable-dev-shm-usage --no-first-run --no-default-browser-check \
   --user-data-dir="${RUNNER_TEMP:-/tmp}/wr-doom-browser" --window-size=740,700 --window-position=810,70 \
