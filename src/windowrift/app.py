@@ -19,6 +19,7 @@ from .bridge import BrowserBridge
 from .capture import capture_region, capture_window_with_origin
 from .crop_dialog import CropDialog
 from .geometry import Rect, advance
+from .omnibox import OmniboxCalibration, looks_like_chrome, portal_position
 from .live import SourceCrop, composite_live_frame, overlaps, tracking_region
 from .tracking import locate_object
 from .segmentation import extract_object
@@ -56,6 +57,15 @@ class LiveBinding:
     tracking: bool
 
 
+@dataclass
+class BrowserDock:
+    sprite: Sprite
+    target_id: int
+    started_at: float
+    source_position: tuple[float, float]
+    original_height: int
+
+
 class ControlPanel(QWidget):
     def __init__(self):
         super().__init__()
@@ -66,6 +76,8 @@ class ControlPanel(QWidget):
         self.sprites: list[Sprite] = []
         self._next_actor_id = 1
         self._live_sources: dict[int, LiveBinding] = {}
+        self._browser_docks: dict[int, BrowserDock] = {}
+        self._omnibox = OmniboxCalibration()
         self._live_executor = ThreadPoolExecutor(max_workers=1)
         self._live_future: Future[tuple[int, Image.Image | None, SourceCrop | None]] | None = None
         self._last_live = 0.0
@@ -138,7 +150,28 @@ class ControlPanel(QWidget):
         row2.addWidget(clear_button)
         root.addLayout(row2)
 
-        root.addWidget(QLabel("3. Browser DOM bridge (optional)"))
+        root.addWidget(QLabel("3. Chrome address bar (visual portal)"))
+        browser_row = QHBoxLayout()
+        self.chrome_targets = QComboBox()
+        self.chrome_targets.setMinimumWidth(320)
+        browser_row.addWidget(self.chrome_targets, 1)
+        dock_button = QPushButton("Into address bar")
+        dock_button.clicked.connect(self.dock_in_chrome)
+        browser_row.addWidget(dock_button)
+        root.addLayout(browser_row)
+        release_button = QPushButton("Release from Chrome")
+        release_button.clicked.connect(self.release_from_chrome)
+        root.addWidget(release_button)
+        note = QLabel(
+            "Displays the selected live sprite in a transparent OS window above "
+            "Chrome's real toolbar. This does not insert into or alter the omnibox. "
+            "Keep browser zoom and display scaling near 100%."
+        )
+        note.setWordWrap(True)
+        note.setObjectName("muted")
+        root.addWidget(note)
+
+        root.addWidget(QLabel("4. Browser DOM bridge (optional)"))
         description = QLabel(
             "Install browser-extension/ in Chrome, copy this session token into the "
             "extension popup, and enable the chosen tab."
@@ -193,6 +226,15 @@ class ControlPanel(QWidget):
                 self.targets.setCurrentIndex(idx)
         self._platforms = [w.bounds for w in self.windows]
         self._known_windows = {w.wid: w for w in self.windows}
+        selected_chrome = self.chrome_targets.currentData()
+        self.chrome_targets.clear()
+        for win in self.windows:
+            if looks_like_chrome(win):
+                self.chrome_targets.addItem(win.title[:75], win.wid)
+        if selected_chrome is not None:
+            index = self.chrome_targets.findData(selected_chrome)
+            if index >= 0:
+                self.chrome_targets.setCurrentIndex(index)
 
     def extract_from_target(self):
         target = next((w for w in self.windows if w.wid == self.targets.currentData()), None)
@@ -286,11 +328,53 @@ class ControlPanel(QWidget):
         QGuiApplication.clipboard().setText(self.bridge.token)
         self.status.setText("Session token copied. Paste it into the Chrome extension popup.")
 
+    def dock_in_chrome(self) -> None:
+        """Fly the latest actor into Chrome's actual toolbar as a visual overlay."""
+        if not self.sprites:
+            self.status.setText("Extract an object from a running game first.")
+            return
+        target_id = self.chrome_targets.currentData()
+        target = self._known_windows.get(target_id)
+        if target is None or not looks_like_chrome(target):
+            self.status.setText("Select a visible Chrome or Chromium window and refresh.")
+            return
+        try:
+            self._omnibox.anchor(target)
+        except ValueError as error:
+            self.status.setText(str(error))
+            return
+        sprite = self.sprites[-1]
+        if sprite.actor_id in self._browser_docks:
+            self.release_from_chrome()
+        original_height = sprite.height()
+        source_position = (sprite.state.x, sprite.state.y)
+        sprite.set_actor_height(33)
+        sprite.set_input_passthrough(True)
+        self._browser_docks[sprite.actor_id] = BrowserDock(
+            sprite, target.wid, time.monotonic(), source_position, original_height,
+        )
+        self.status.setText(
+            "Actor is moving over Chrome's real search/address bar. "
+            "This is a native transparent overlay, not a modification of Chrome UI."
+        )
+
+    def release_from_chrome(self) -> None:
+        """Restore ordinary desktop physics without stealing Chrome's input."""
+        for dock in tuple(self._browser_docks.values()):
+            sprite = dock.sprite
+            self._browser_docks.pop(sprite.actor_id, None)
+            sprite.set_input_passthrough(False)
+            sprite.set_actor_height(min(512, max(16, dock.original_height)))
+            sprite.state.vx = 80.0
+            sprite.state.vy = 40.0
+        self.status.setText("Released browser actors back to desktop physics.")
+
     def toggle_pause(self):
         self.paused = not self.paused
         self.pause_button.setText("Resume physics" if self.paused else "Pause physics")
 
     def remove_sprite(self, sprite: Sprite):
+        self._browser_docks.pop(sprite.actor_id, None)
         self._live_sources.pop(sprite.actor_id, None)
         if sprite in self.sprites:
             self.sprites.remove(sprite)
@@ -330,6 +414,22 @@ class ControlPanel(QWidget):
         if not self.paused:
             desktop = self._desktop()
             for sprite in self.sprites:
+                dock = self._browser_docks.get(sprite.actor_id)
+                if dock is not None:
+                    browser = self._known_windows.get(dock.target_id)
+                    if browser is not None:
+                        try:
+                            destination = self._omnibox.anchor(browser)
+                            x, y = portal_position(
+                                dock.source_position, destination,
+                                (sprite.width(), sprite.height()),
+                                now - dock.started_at,
+                            )
+                        except ValueError:
+                            continue
+                        sprite.state.x, sprite.state.y = float(x), float(y)
+                        sprite.move(x, y)
+                    continue
                 if sprite.dragging:
                     continue
                 sprite.state = advance(sprite.state, dt, desktop, self._platforms)

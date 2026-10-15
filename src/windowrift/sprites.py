@@ -17,6 +17,7 @@ class Sprite(QWidget):
     def __init__(self, picture: Image.Image, x: int, y: int, size: int = 180):
         super().__init__(None)
         pix = to_pixmap(picture)
+        self._source = pix
         self.pixmap = pix.scaled(300, size, Qt.AspectRatioMode.KeepAspectRatio,
                                  Qt.TransformationMode.SmoothTransformation)
         flags = (Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint |
@@ -34,11 +35,31 @@ class Sprite(QWidget):
 
     def update_picture(self, picture: Image.Image) -> None:
         """Change pixels in place without moving or resizing the desktop actor."""
-        self.pixmap = to_pixmap(picture).scaled(
+        self._source = to_pixmap(picture)
+        self.pixmap = self._source.scaled(
             self.size(), Qt.AspectRatioMode.IgnoreAspectRatio,
             Qt.TransformationMode.SmoothTransformation,
         )
         self.update()
+
+    def set_actor_height(self, height: int) -> None:
+        """Resize the desktop actor from its source image, without cumulative blur."""
+        if not 16 <= height <= 512:
+            raise ValueError("Actor height must be between 16 and 512 pixels.")
+        self.pixmap = self._source.scaled(
+            512, height, Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation,
+        )
+        self.setFixedSize(self.pixmap.size())
+        self.state.width = float(self.width())
+        self.state.height = float(self.height())
+        self.update()
+
+    def set_input_passthrough(self, enabled: bool) -> None:
+        """Keep the browser address bar clickable while the portal crosses it."""
+        self.setWindowFlag(Qt.WindowType.WindowTransparentForInput, enabled)
+        self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
+        self.show()
 
     def paintEvent(self, event):
         painter = QPainter(self)

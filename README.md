@@ -1,10 +1,45 @@
 # WindowRift
 
-**Pull objects out of application windows and let them interact with your desktop.**
+**Make a game character walk out of its window and across Chrome's actual address bar.**
 
-WindowRift turns **visible pixels** from a program window into an independent desktop actor. Select a window, draw a box around a character or object, extract its foreground, and drag it across your desktop. Sprites have gravity and can land on other application windows. An optional browser extension lets them collide with real page elements.
+WindowRift captures an object from a visible application and renders it in an independent transparent desktop window. You can drag it, enable live pixels, or send it across the real Chrome/Chromium omnibox. The native overlay is shaped and leaves the browser keyboard/mouse input usable; no fake browser window or screenshot compositing is required.
 
-WindowRift is an **experimental visual-interaction prototype**, not a universal game-state modder. It does **not** remove characters from their original applications, read game memory, or change hidden game logic.
+**Scope:** for arbitrary applications this is a visual overlay, *not* a transfer of executable game objects or state. The bundled playable Rift Arcade has a small opt-in localhost adapter that also hides its original sprite during the demo and restores it afterward. Other games remain unchanged. Chrome's browser-owned address bar cannot be modified through web-page DOM APIs.
+
+## Chrome omnibox: recorded from actual running windows
+
+![Actual X11 recording: the playable game source, an OS-level actor crossing to Chromium's native address/search bar, and real keyboard input in the omnibox.](docs/media/omnibox-handoff.gif)
+
+[Full desktop screenshot](docs/media/chrome-omnibox-actual.png) · [Cropped screenshot](docs/media/chrome-omnibox-cropped.png)
+
+These frames were recorded from **Xvfb + Openbox, an active Tk game, and a real Chromium window** on 2026-10-15. The address/search bar and its suggestion dropdown belong to Chromium. Only the cutout sprite belongs to the separate WindowRift window. The screenshot is not generated, composited, or a mocked Chrome page; the GIF is a sequence of captured desktop frames (cropped/scaled to keep it small).
+
+The native Chrome toolbar portal works as follows:
+
+1. Capture a foreground cutout from the source window.
+2. Fly an always-on-top, input-transparent actor across the desktop into the browser's actual omnibox area.
+3. Follow the browser's window position while the actor moves inside the address bar; Chrome's normal search input stays functional.
+4. **Bundled game only, optional:** a localhost handoff message hides the game's original sprite while it is outside, and a short lease restores it automatically if the demo dies.
+
+### Reproduce the native Chrome search-bar demo on Linux X11
+
+Install the project first (see Quick start), and have a normal Chrome or Chromium window open. Two terminals should share the same ephemeral demo token:
+
+```bash
+# In each terminal, set the same temporary token (example value is not private).
+export WINDOWRIFT_DEMO_TOKEN='change-this-local-demo-token'
+
+# Terminal 1: a real, playable source game with opt-in visibility handoff
+python examples/rift_arcade.py --demo-handoff
+
+# Terminal 2: Chrome must already be open. The demo captures live pixels and
+# puts the actor above the *real* browser address/search widget.
+python examples/chrome_omnibox_demo.py --duration 0
+```
+
+Without `WINDOWRIFT_DEMO_TOKEN`, you can run the same overlay without changing the original game. When multiple browser windows exist, select one with `--browser-id 0x...` (get IDs from `wmctrl -l`). `--crop x,y,w,h` picks another source object, and `--source-title` chooses a different application. The defaults select the small Rift Arcade character. For different Chrome toolbar layouts, adjust `--left`, `--top`, `--right` and `--height`; positions are calibrated estimates, not Chrome internal widget bounds.
+
+For a more general workflow, use the WindowRift Qt panel, extract any visible object, select the Chrome window and click **Into address bar**. **Release from Chrome** returns the actor to desktop physics. This mode is supported on Windows and Linux X11 in code, but the actual omnibox proof here was recorded on Linux X11. The optional game handoff is provided only by Rift Arcade and is not available for other games.
 
 ## Actual X11 demonstration
 
@@ -27,6 +62,7 @@ in the running game; no game-memory modifications are claimed.
 | Foreground extraction | Local OpenCV GrabCut, fast flat-background color key for pixel art, optional CPU-based AI (`rembg`), or an unmasked rectangle. |
 | Desktop actors | Independent transparent windows with dragging, gravity, screen-edge bouncing, and landing on other window tops. |
 | **Live pixels (experimental)** | Refresh pixels using the original foreground mask; optional bounded template tracking follows a moving object within its visible source window (72 px per sample). This does not read game state. |
+| **Chrome address bar visual portal** | Independent click-through actor over the real browser toolbar; the source game is not modified, except the opt-in Rift Arcade demo adapter. |
 | Browser DOM bridge | Per-tab Chrome extension for webpages, or a direct token-based connection from the included local collision lab. Opted-in targets receive real `windowrift:impact` events. |
 | Local only | No screenshot uploads or external inference API. The bridge listens on `127.0.0.1` and requires a random token generated each run. |
 
@@ -119,7 +155,9 @@ Visible application window ─── screen capture ─── selection rectangl
 
 ## Scope and boundaries
 
-- **Visual extraction, not executable or game-state extraction.** Original objects remain in their program. Motion tracking searches nearby visible pixels but does not change the source process or transfer physics state from the original game.
+- **Visual extraction, not executable or game-state extraction.** Original objects remain in arbitrary programs. Motion tracking searches nearby visible pixels but does not change their process or transfer physics state. The bundled Rift Arcade demo is a narrowly scoped first-party exception: it voluntarily hides/restores its own sprite on a localhost command.
+- **Chrome omnibox is browser UI, not page DOM.** The actor appears above it as a separate OS window with input pass-through. It cannot be copied into Chrome's internal search control, and it cannot read or change Chrome's address or search query.
+- **Demo handoff is opt-in.** `WINDOWRIFT_DEMO_TOKEN` is shared only between the demo game and harness. The local UDP adapter accepts only `lift`, `keepalive`, `return`, `status`; a lease restores the game if the harness disappears.
 - **Capture of visible pixels.** Minimized, obscured, protected or exclusive fullscreen windows cannot be reliably captured. Mixed-DPI and decorated windows may have coordinate drift; especially on Linux X11 and Chrome.
 - **No arbitrary modification.** WindowRift does not inject code into other processes, flash firmware, bypass game protections, control anti-cheat or automate unknown APIs.
 - **Privacy.** Screenshots are processed locally; the optional AI model may be downloaded by `rembg` during setup. Use only windows and content you are permitted to capture. Keep the local bridge token private.
@@ -136,7 +174,7 @@ node --check browser-extension/popup.js
 node --test tests/js/*.test.cjs
 ```
 
-The tests cover geometry, color-key and GrabCut segmentation, bounded template tracking, clipped screen coordinates, alpha compositing, WebSocket bridge validation, X11 window discovery, and browser-extension collision events. A real X11 proof run with Rift Arcade and Chromium confirmed foreground extraction, a shaped desktop actor, and an opt-in DOM event. The production PySide6 control panel and Windows behavior still require end-to-end verification on suitable hosts.
+The tests cover geometry, color-key and GrabCut segmentation, bounded template tracking, Chrome toolbar geometry/motion, local handoff authentication and fail-safe leasing, screen capture, WebSocket validation, X11 window discovery, and browser-extension collision events. A real X11 run verified game sprite extraction, optional source-actor hiding/restoration, a shaped click-through actor over the actual Chromium address bar, and typing into that bar while the actor remains visible. The proof uses Tk/XShape; the production PySide6 panel and Windows behavior still require GUI end-to-end testing on suitable hosts.
 
 See the [Korean setup and demo guide](docs/README_ko.md) for additional details.
 
@@ -146,6 +184,7 @@ See the [Korean setup and demo guide](docs/README_ko.md) for additional details.
 - [ ] Per-platform coordinate calibration for browsers and mixed DPI monitors.
 - [ ] Optional per-app adapter protocol for actual source-object state synchronization.
 - [x] Captured X11 game + desktop actor + browser event using the lightweight proof harness.
+- [x] Demonstrated an actor over the actual Chromium omnibox with live text input and opt-in source visibility handoff.
 - [ ] Verify the production Qt control panel on Windows and X11 with manual GUI tests and recorded evidence.
 
 ## License

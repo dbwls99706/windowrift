@@ -2,14 +2,37 @@
 
 WindowRift는 실행 중인 프로그램의 **보이는 화면 속 객체를 데스크톱 위로 꺼내는 시각적 실험 도구**이다. 선택한 창을 캡처하고 객체를 잘라낸 다음, 독립적인 투명 창으로 띄워 드래그하고 중력·창 경계 충돌을 적용한다.
 
-**실제 게임 객체를 메모리에서 꺼내거나 원본 게임에서 제거하는 프로그램은 아니다.** 추출 대상은 화면 픽셀이며, 내부 게임 상태나 원본 애니메이션 정보를 복사하는 것은 현재 범위 밖이다.
+**임의 게임 객체를 메모리에서 꺼내는 프로그램은 아니다.** 추출 대상은 화면 픽셀이다. 다만 번들 예제 게임 Rift Arcade는 별도 동의로 켠 로컬 핸드오프를 통해 원본 캐릭터를 일시적으로 숨기고 복귀시킬 수 있다. 이는 다른 게임에 적용되는 범용 기능이 아니다.
+
+## 실제 Chromium 검색·주소창 탈출 시연
+
+![실제로 실행 중인 게임에서 Chromium 검색·주소창으로 객체가 이동하는 X11 데스크톱 녹화](media/omnibox-handoff.gif)
+
+[원본 스크린샷](media/chrome-omnibox-actual.png)
+
+가상 X11에서 직접 실행 중인 Rift Arcade와 Chromium을 캡처한 결과이다. Chrome UI를 흉내 낸 HTML이 아니고, 별도의 투명 X11 창을 Chrome의 **실제 주소창 위에 겹친 것**이다. 검색창에서 키보드로 문장을 입력해도 정상 동작한다. Chrome의 내부 UI를 변조하거나 게임 코드를 크롬 프로세스에 삽입하는 기능은 아니다.
+
+Ubuntu X11에서 아래 순서로 실행하면 된다. 첫 번째, 두 번째 터미널에 동일한 임시 토큰을 지정한다.
+
+```bash
+export WINDOWRIFT_DEMO_TOKEN='change-this-local-demo-token'
+# 터미널 1
+python examples/rift_arcade.py --demo-handoff
+# 터미널 2 (Chrome/Chromium 일반 창을 먼저 열어둘 것)
+python examples/chrome_omnibox_demo.py --duration 0
+```
+
+게임은 실제로 동작하며, 핸드오프 활성화 시 원본 캐릭터를 숨겼다가 종료 시 복원한다. 포털 프로세스가 비정상 종료되면 게임이 제한시간 내 자동 복원한다. Chrome 창이 여러 개라면 `wmctrl -l`의 창 ID를 `--browser-id 0x...`로 지정한다. 다른 프로그램에서 시험하려면 `--source-title`과 `--crop x,y,w,h`로 소스와 영역을 지정하면 된다. 다만 다른 프로그램의 캐릭터를 제거하는 기능은 없다.
+
+일반 WindowRift Qt 앱에서도 객체를 추출한 뒤 Chrome 창을 선택하고 **Into address bar**를 누를 수 있으며, **Release from Chrome**으로 다시 데스크톱에 내려놓을 수 있다. Windows에서 이 UI의 실기 테스트는 아직 진행되지 않았다.
 
 ## 기능
 
 - Windows와 Linux X11에서 보이는 프로그램 창 선택 및 영역 캡처
 - OpenCV GrabCut 배경 제거, 선택적 `rembg` AI 배경 제거, 사각형 캡처
 - 데스크톱 위 투명 캐릭터 드래그·중력·반사·다른 창 위에 착지
-- **Live pixels:** 원본 창의 선택 영역을 주기적으로 다시 캡처하여 **고정된 마스크 내부 픽셀을 갱신**한다. 정지 이미지보다는 동적인 모습을 볼 수 있지만, 움직이는 캐릭터를 자동 추적하지는 않는다.
+- **Live pixels:** 원본 창의 선택 영역을 주기적으로 다시 캡처하여 고정된 마스크 내부 픽셀을 갱신한다. 선택적 **Track motion**은 주변 72픽셀 안에서 원본과 비슷한 패턴을 찾아 추적하지만, 빠른 이동이나 가림에 취약하다.
+- **Chrome 주소창 오버레이:** 실제 브라우저 검색·주소창 위에 투명 캐릭터 창을 표시하고 브라우저 창 이동을 따라간다. 키 입력을 막지 않는다.
 - Chrome 확장을 켜면 실제 DOM 요소의 CSS가 변화하고, `data-windowrift-target` 영역에는 `windowrift:impact` 이벤트가 발생한다.
 
 ## 설치 (Ubuntu 22.04, X11 기준)

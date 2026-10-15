@@ -9,6 +9,10 @@ from __future__ import annotations
 
 import math
 import sys
+import argparse
+import os
+
+from windowrift.demo_handoff import DemoHandoffServer
 from pathlib import Path
 import tkinter as tk
 from PIL import Image, ImageTk
@@ -19,6 +23,18 @@ G = 1060
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description="Small playable game for WindowRift demonstrations")
+    parser.add_argument("--demo-handoff", action="store_true",
+                        help="Allow a local opt-in WindowRift demo to hide/restore the actor")
+    parser.add_argument("--handoff-port", type=int, default=8973)
+    args = parser.parse_args()
+    secret = os.environ.get("WINDOWRIFT_DEMO_TOKEN", "")
+    handoff = None
+    if args.demo_handoff:
+        if len(secret) < 12:
+            parser.error("Set WINDOWRIFT_DEMO_TOKEN (12+ characters) in both demo processes")
+        handoff = DemoHandoffServer(secret, args.handoff_port)
+        print(f"DEMO_HANDOFF_PORT={handoff.port}", flush=True)
     root = tk.Tk()
     root.title("Rift Arcade - A WindowRift Playable Demo")
     root.geometry(f"{WIDTH}x{HEIGHT}+65+110")
@@ -97,6 +113,9 @@ def main() -> None:
         if state["y"] >= 367: state["vy"] = 0
         bob = round(3 * math.sin(state["time"] * 5))
         canvas.coords(actor, round(state["x"]), round(state["y"]) + bob)
+        if handoff is not None:
+            handoff.poll()
+            canvas.itemconfigure(actor, state="hidden" if handoff.state.lifted else "normal")
         for x, gem in list(state["remaining"]):
             if abs(x - state["x"]) < 31 and abs(236 - state["y"]) < 49:
                 canvas.delete(gem)
@@ -106,6 +125,8 @@ def main() -> None:
         root.after(33, tick)
 
     tick()
+    if handoff is not None:
+        root.protocol("WM_DELETE_WINDOW", lambda: (handoff.close(), root.destroy()))
     root.mainloop()
 
 
