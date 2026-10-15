@@ -12,9 +12,11 @@ from websockets.asyncio.server import serve
 
 
 class BrowserBridge:
-    def __init__(self, port: int = 8765) -> None:
+    def __init__(self, port: int = 8765, *, token: str | None = None) -> None:
+        if token is not None and len(token) < 16:
+            raise ValueError("Browser bridge token must be at least 16 characters")
         self.port = port
-        self.token = secrets.token_urlsafe(24)
+        self.token = token if token is not None else secrets.token_urlsafe(24)
         self._loop: asyncio.AbstractEventLoop | None = None
         self._clients: set = set()
         self._thread: threading.Thread | None = None

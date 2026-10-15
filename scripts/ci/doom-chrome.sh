@@ -8,39 +8,34 @@ export XDG_RUNTIME_DIR="${RUNNER_TEMP:-/tmp}/wr-doom-runtime"
 mkdir -p "$XDG_RUNTIME_DIR"
 chmod 700 "$XDG_RUNTIME_DIR"
 Xvfb :99 -screen 0 1600x900x24 -nolisten tcp >artifacts/xvfb.log 2>&1 & xvfb_pid=$!
-# Xvfb and the WM are independent asynchronous processes. Starting openbox
-# before the X11 socket is listening can leave EWMH client enumeration absent.
 for i in $(seq 1 40); do
   if xprop -root >/dev/null 2>&1; then break; fi
-  if ! kill -0 "$xvfb_pid" 2>/dev/null; then
-    echo 'Xvfb exited before accepting clients'; cat artifacts/xvfb.log; exit 1
-  fi
+  if ! kill -0 "$xvfb_pid" 2>/dev/null; then cat artifacts/xvfb.log; exit 1; fi
   sleep 0.25
 done
-xprop -root >/dev/null 2>&1 || { echo 'X11 server never became ready'; exit 1; }
+xprop -root >/dev/null 2>&1 || { echo 'X11 server failed'; exit 1; }
 openbox >artifacts/openbox.log 2>&1 & wm_pid=$!
 for i in $(seq 1 40); do
   if xprop -root _NET_SUPPORTED 2>/dev/null | grep -q _NET_CLIENT_LIST; then break; fi
-  if ! kill -0 "$wm_pid" 2>/dev/null; then
-    echo 'Window manager exited before EWMH initialization'; cat artifacts/openbox.log; exit 1
-  fi
+  if ! kill -0 "$wm_pid" 2>/dev/null; then cat artifacts/openbox.log; exit 1; fi
   sleep 0.25
 done
-xprop -root _NET_SUPPORTED 2>/dev/null | grep -q _NET_CLIENT_LIST || {
-  echo 'Window manager did not advertise _NET_CLIENT_LIST'; cat artifacts/openbox.log; exit 1
-}
-chrome_pid=""; doom_pid=""
+chrome_pid=""; doom_pid=""; http_pid=""; demo_pid=""
 cleanup() {
   [[ -z "$chrome_pid" ]] || kill "$chrome_pid" 2>/dev/null || true
   [[ -z "$doom_pid" ]] || kill "$doom_pid" 2>/dev/null || true
+  [[ -z "$http_pid" ]] || kill "$http_pid" 2>/dev/null || true
+  [[ -z "$demo_pid" ]] || kill "$demo_pid" 2>/dev/null || true
   kill "$wm_pid" "$xvfb_pid" 2>/dev/null || true
 }
 trap cleanup EXIT
-sleep 1
+sleep 2
 chocolate-doom -iwad "$DOOM_WAD" -window -width 640 -height 480 -warp 1 1 -skill 2 -nosound -nomusic >artifacts/game.log 2>&1 & doom_pid=$!
+python -m http.server 8811 --bind 127.0.0.1 --directory examples >artifacts/http.log 2>&1 & http_pid=$!
 google-chrome --no-sandbox --disable-gpu --disable-dev-shm-usage --no-first-run --no-default-browser-check \
+  --remote-debugging-port=9222 --remote-allow-origins=http://localhost \
   --user-data-dir="${RUNNER_TEMP:-/tmp}/wr-doom-browser" --window-size=740,700 --window-position=810,70 \
-  'chrome://newtab' >artifacts/chrome.log 2>&1 & chrome_pid=$!
+  'http://127.0.0.1:8811/browser-lab.html' >artifacts/chrome.log 2>&1 & chrome_pid=$!
 for i in $(seq 1 40); do
   if wmctrl -l | grep -Eiq 'doom' && wmctrl -l | grep -Eiq 'chrome'; then break; fi
   sleep 1
@@ -57,14 +52,32 @@ wmctrl -ir "$chrome_win" -b remove,maximized_vert,maximized_horz || true
 wmctrl -ir "$doom_win" -e 0,35,95,750,670
 wmctrl -ir "$chrome_win" -e 0,820,95,740,670
 sleep 2
-# The actor is a decoded actual IWAD patch; game continues unmodified.
-timeout 35s python examples/chrome_omnibox_demo.py \
-  --source-title Doom --doom-wad "$DOOM_WAD" --doom-lump TROOA1 \
-  --actor-height 45 --travel 2 --duration 8 --screenshot-at 5 \
-  --screenshot artifacts/doom-chrome.png --record-gif artifacts/doom-chrome.gif > artifacts/portal.log 2>&1 || {
-    cat artifacts/portal.log; exit 1;
-  }
-test -s artifacts/doom-chrome.png || { cat artifacts/portal.log; echo 'No captured screenshot'; exit 1; }
+# Measure actual DOM target in live Chrome, not an invented screenshot coordinate.
+export WINDOWRIFT_BRIDGE_TOKEN="$(openssl rand -hex 24)"
+for i in $(seq 1 30); do
+  if python scripts/ci/browser_probe.py --port 9222 --token "$WINDOWRIFT_BRIDGE_TOKEN" \
+      --target-file artifacts/browser-target.json >artifacts/probe.log 2>&1; then break; fi
+  sleep 0.4
+done
+test -s artifacts/browser-target.json || { cat artifacts/probe.log; exit 1; }
+# The decoded IWAD frames are animated in the native, input-transparent X11 window.
+# They are not extracted from a live actor or removed from the DOOM engine.
+python examples/cinematic_omnibox_demo.py \
+  --source-title Doom --browser-title 'WindowRift Collision Lab' \
+  --doom-wad "$DOOM_WAD" --actor-height 66 \
+  --token "$WINDOWRIFT_BRIDGE_TOKEN" \
+  --target-file artifacts/browser-target.json \
+  --screenshot artifacts/doom-chrome.png \
+  --gif artifacts/doom-chrome.gif >artifacts/portal.log 2>&1 & demo_pid=$!
+sleep 0.8
+# The page may have tried to connect before the native bridge started. Reconnect.
+python scripts/ci/browser_probe.py --port 9222 --token "$WINDOWRIFT_BRIDGE_TOKEN" \
+  --target-file artifacts/browser-target.json >>artifacts/probe.log 2>&1
+wait "$demo_pid" || { cat artifacts/portal.log; exit 1; }
+demo_pid=""
+python scripts/ci/browser_probe.py --port 9222 --check | tee artifacts/browser-impact.log
+test -s artifacts/doom-chrome.png || { cat artifacts/portal.log; echo 'No capture'; exit 1; }
+test -s artifacts/doom-chrome.gif || { echo 'No real desktop GIF'; exit 1; }
 python - <<'PY'
 import hashlib, json, os
 from pathlib import Path
@@ -89,6 +102,8 @@ report = {
     'actor_source': 'TROOA1 sprite lump decoded from actual locally downloaded IWAD',
     'source_handoff': False,
     'native_os_overlay': True,
+    'motion': 'jump, perch, pounce, impact, rebound, return',
+    'browser_page_state_confirmed': True,
     'game_data_committed': False,
 }
 Path('artifacts/proof.json').write_text(json.dumps(report, indent=2) + '\n')

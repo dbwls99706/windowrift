@@ -19,7 +19,8 @@ from .bridge import BrowserBridge
 from .capture import capture_region, capture_window_with_origin
 from .crop_dialog import CropDialog
 from .geometry import Rect, advance
-from .omnibox import OmniboxCalibration, looks_like_chrome, portal_position
+from .omnibox import OmniboxCalibration, looks_like_chrome
+from .choreography import cinematic_pose, scene_duration
 from .live import SourceCrop, composite_live_frame, overlaps, tracking_region
 from .tracking import locate_object
 from .segmentation import extract_object
@@ -155,7 +156,7 @@ class ControlPanel(QWidget):
         self.chrome_targets = QComboBox()
         self.chrome_targets.setMinimumWidth(320)
         browser_row.addWidget(self.chrome_targets, 1)
-        dock_button = QPushButton("Into address bar")
+        dock_button = QPushButton("Jump out → Chrome → impact → return")
         dock_button.clicked.connect(self.dock_in_chrome)
         browser_row.addWidget(dock_button)
         root.addLayout(browser_row)
@@ -163,8 +164,8 @@ class ControlPanel(QWidget):
         release_button.clicked.connect(self.release_from_chrome)
         root.addWidget(release_button)
         note = QLabel(
-            "Displays the selected live sprite in a transparent OS window above "
-            "Chrome's real toolbar. This does not insert into or alter the omnibox. "
+            "The extracted sprite makes a timed leap into Chrome, rebounds into the "
+            "page and returns. This is an OS overlay, not a browser UI modification. "
             "Keep browser zoom and display scaling near 100%."
         )
         note.setWordWrap(True)
@@ -348,14 +349,14 @@ class ControlPanel(QWidget):
             self.release_from_chrome()
         original_height = sprite.height()
         source_position = (sprite.state.x, sprite.state.y)
-        sprite.set_actor_height(33)
+        sprite.set_actor_height(58)
         sprite.set_input_passthrough(True)
         self._browser_docks[sprite.actor_id] = BrowserDock(
             sprite, target.wid, time.monotonic(), source_position, original_height,
         )
         self.status.setText(
-            "Actor is moving over Chrome's real search/address bar. "
-            "This is a native transparent overlay, not a modification of Chrome UI."
+            "Actor launched: jump → address bar → webpage impact → return. "
+            "This is a native overlay, not an in-game object transfer."
         )
 
     def release_from_chrome(self) -> None:
@@ -364,6 +365,7 @@ class ControlPanel(QWidget):
             sprite = dock.sprite
             self._browser_docks.pop(sprite.actor_id, None)
             sprite.set_input_passthrough(False)
+            sprite.set_visual_pose(0.0, 1.0)
             sprite.set_actor_height(min(512, max(16, dock.original_height)))
             sprite.state.vx = 80.0
             sprite.state.vy = 40.0
@@ -420,11 +422,22 @@ class ControlPanel(QWidget):
                     if browser is not None:
                         try:
                             destination = self._omnibox.anchor(browser)
-                            x, y = portal_position(
-                                dock.source_position, destination,
-                                (sprite.width(), sprite.height()),
-                                now - dock.started_at,
+                            elapsed = now - dock.started_at
+                            if elapsed >= scene_duration():
+                                self._browser_docks.pop(sprite.actor_id, None)
+                                sprite.set_visual_pose(0.0, 1.0)
+                                sprite.set_input_passthrough(False)
+                                sprite.set_actor_height(dock.original_height)
+                                sprite.state.x, sprite.state.y = dock.source_position
+                                sprite.move(round(sprite.state.x), round(sprite.state.y))
+                                sprite.state.vx, sprite.state.vy = 60.0, -80.0
+                                continue
+                            pose = cinematic_pose(
+                                dock.source_position, destination, browser.bounds,
+                                (sprite.width(), sprite.height()), elapsed,
                             )
+                            x, y = pose.x, pose.y
+                            sprite.set_visual_pose(pose.tilt, pose.squash)
                         except ValueError:
                             continue
                         sprite.state.x, sprite.state.y = float(x), float(y)

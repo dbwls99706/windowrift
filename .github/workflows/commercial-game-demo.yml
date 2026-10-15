@@ -4,10 +4,13 @@ on:
     paths:
       - '.github/workflows/commercial-game-demo.yml'
       - 'scripts/ci/doom-chrome.sh'
-      - 'examples/chrome_omnibox_demo.py'
+      - 'examples/cinematic_omnibox_demo.py'
       - 'src/windowrift/doom_wad.py'
       - 'src/windowrift/proof_capture.py'
       - 'src/windowrift/omnibox.py'
+      - 'src/windowrift/choreography.py'
+      - 'scripts/ci/browser_probe.py'
+      - 'src/windowrift/bridge.py'
       - 'src/windowrift/windows.py'
       - 'tests/test_doom_wad.py'
   workflow_dispatch:
@@ -22,7 +25,7 @@ jobs:
       - name: Install source port and X11 tools
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends chocolate-doom xvfb openbox wmctrl x11-utils python3-venv python3-tk libegl1 libopengl0 libxcb-cursor0 libxkbcommon-x11-0
+          sudo apt-get install -y --no-install-recommends chocolate-doom xvfb openbox wmctrl python3-venv python3-tk libegl1 libopengl0 libxcb-cursor0 libxkbcommon-x11-0
           python3 -m venv .venv
           .venv/bin/python -m pip install -e '.[dev]'
           echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
@@ -49,9 +52,9 @@ jobs:
             artifacts/proof.json
             artifacts/game.log
             artifacts/portal.log
-            artifacts/xvfb.log
-            artifacts/openbox.log
-            artifacts/chrome.log
-            artifacts/windows.txt
+            artifacts/probe.log
+            artifacts/browser-impact.log
+            artifacts/browser-target.json
+            artifacts/http.log
           if-no-files-found: warn
           retention-days: 7

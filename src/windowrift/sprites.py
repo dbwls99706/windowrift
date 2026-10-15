@@ -27,6 +27,8 @@ class Sprite(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_NoSystemBackground, True)
         self.setFixedSize(self.pixmap.size())
         self.state = ActorState(float(x), float(y), float(self.width()), float(self.height()))
+        self.visual_tilt = 0.0
+        self.visual_squash = 1.0
         self.dragging = False
         self.actor_id = -1
         self.drag_offset = QPoint()
@@ -61,9 +63,22 @@ class Sprite(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
         self.show()
 
+    def set_visual_pose(self, tilt: float, squash: float) -> None:
+        """Animate the real Qt overlay without altering source images."""
+        tilt = max(-40.0, min(40.0, float(tilt)))
+        squash = max(0.7, min(1.35, float(squash)))
+        if abs(self.visual_tilt - tilt) > 0.1 or abs(self.visual_squash - squash) > 0.01:
+            self.visual_tilt, self.visual_squash = tilt, squash
+            self.update()
+
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.translate(self.width() / 2, self.height() / 2)
+        painter.rotate(self.visual_tilt)
+        painter.scale(1.0 / self.visual_squash, self.visual_squash)
+        painter.translate(-self.width() / 2, -self.height() / 2)
         painter.drawPixmap(0, 0, self.pixmap)
         painter.end()
 
