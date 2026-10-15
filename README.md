@@ -71,8 +71,11 @@ its WAD is a separate click-through X11 window above Chrome's real address bar.]
 Screenshot from [verified game integration CI](https://github.com/dbwls99706/windowrift/actions/runs/38692731397),
 not a drawing or a reconstruction. The original DOOM engine was actually
 running; the displayed Imp is a WAD-sourced independent overlay, not a
-removed in-world enemy. The newer workflow additionally records an animated
-X11 screen-capture GIF when it succeeds.
+removed in-world enemy. A later [**verified real desktop recording**](https://github.com/dbwls99706/windowrift/actions/runs/38693889712)
+captured **35 consecutive X11 frames** of Chocolate Doom and the Chrome portal.
+Open its downloadable `doom-shareware-chrome-x11` artifact to view the
+`doom-chrome.gif` recording (artifact retention: seven days). The recording
+is authentic screen capture, not a composited or AI-rendered reconstruction.
 
 This is a **read-only asset-assisted demonstration with a real commercial-game
 engine**. It is *not* generic game-state extraction, live Imp tracking,

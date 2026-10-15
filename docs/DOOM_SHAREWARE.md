@@ -75,3 +75,16 @@ The original game archive matched the published DOOM 1.9 shareware MD5;
 Chocolate Doom and Chrome ran simultaneously in X11, and the result is
 shown at [this authentic screenshot](media/doom-shareware-chrome-x11.png).
 The verification does not establish an in-game actor state handoff.
+
+## Actual animated commercial-game recording
+
+A later [**successful GitHub Actions run #38693889712**](https://github.com/dbwls99706/windowrift/actions/runs/38693889712)
+started the original Doom 1.9 shareware game under Chocolate Doom and Google
+Chrome on X11, then recorded 35 consecutive desktop frames to
+`artifacts/doom-chrome.gif`. The workflow's downloadable
+`doom-shareware-chrome-x11` artifact also includes its screenshot,
+`proof.json`, and executable logs (seven-day artifact retention).
+The native overlay comes from the original `TROOA1` sprite patch in the
+locally acquired shareware data. It is **not** a live transferred Doom enemy,
+source-process patch, or AI-generated game art.
+
