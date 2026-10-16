@@ -1,0 +1,35 @@
+name: binary discovery
+on:
+  push:
+    paths:
+      - '.github/workflows/binary-discovery.yml'
+      - 'src/windowrift/binary_probe.py'
+      - 'src/windowrift/binary_cli.py'
+      - 'tests/test_binary_probe.py'
+      - 'scripts/ci/binary-discovery.sh'
+      - 'pyproject.toml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  published-native-game:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install tools and a published native game
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends chocolate-doom binutils
+          python -m pip install -e '.[dev]'
+      - name: Verify binary evidence and no mutation
+        run: bash scripts/ci/binary-discovery.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-game-binary-evidence
+          path: artifacts/binary-discovery/
+          retention-days: 7

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "windowrift-desktop"
-version = "0.11.0"
+version = "0.12.0"
 description = "State-preserving object portals between consenting applications and the desktop."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -30,6 +30,7 @@ windowrift-mc = "windowrift.minecraft_cli:main"
 windowrift-real = "windowrift.minecraft_desktop:main"
 windowrift-mob = "windowrift.minecraft_mob_desktop:main"
 windowrift-portal = "windowrift.portal_cli:main"
+windowrift-inspect = "windowrift.binary_cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

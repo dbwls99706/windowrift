@@ -2,7 +2,7 @@
 
 > **Native object portals across application boundaries, not just cutout images.**
 
-**Status: v0.11.0 experimental.** A capability-first, opt-in adapter interface
+**Status: v0.12.0 experimental.** A capability-first, opt-in adapter interface
 connects game-owned object state to a desktop representation and back. Real
 Minecraft Java 1.21.1 blocks preserve original block state in a world vault.
 Tagged living mobs retain their **original native entity UUID** in a
@@ -22,6 +22,21 @@ seamless visual extraction from a real playable game window.
 - Native commands: \`windowrift-portal adapters\` and \`windowrift-mob\`
 - Proof workflows: [native Minecraft mob](.github/workflows/real-mob.yml),
   [native Minecraft blocks](.github/workflows/real-minecraft.yml)
+
+
+## Binary-first application discovery (experimental)
+
+`windowrift-inspect` now accepts **PE / ELF / JAR** executables and emits an evidence-based, read-only JSON report: executable architecture, sections, ELF imported libraries, likely game-engine markers, symbol hints, and optionally a bounded `objdump` assembly excerpt. On Windows and Linux, it can identify a running executable using read-only process metadata.
+
+```bash
+windowrift-inspect /path/to/game.exe --assembly --output investigation.json
+windowrift-inspect /path/to/game.jar --output investigation.json
+windowrift-inspect --pid 12345 --output process.json
+```
+
+**Binary discovery does not remove or control living game objects.** It does not patch files, read game-object memory, inject hooks or bypass anti-cheat. REA/Ghidra-assisted reversing and a validated per-engine runtime adapter are further steps toward stateful portals, not capabilities this command already provides. For the precise evidence/verification boundary, see [binary discovery and portal research](docs/BINARY_DISCOVERY.md).
+
+The [native game binary CI](.github/workflows/binary-discovery.yml) inspects a real packaged Chocolate Doom executable and verifies its SHA-256 is unchanged. That is proof of executable analysis, **not a graphical game crossover**.
 
 ## Legacy visual-only demos
 
