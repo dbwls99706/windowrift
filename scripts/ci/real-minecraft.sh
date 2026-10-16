@@ -55,6 +55,7 @@ for i in $(seq 1 40); do
 done
 xprop -root _NET_SUPPORTED 2>/dev/null | grep -q _NET_CLIENT_LIST || { echo 'No window manager'; exit 1; }
 export QT_QPA_PLATFORM=xcb
+export QT_DEBUG_PLUGINS=1
 python scripts/ci/real_minecraft_gui_proof.py \
   | tee artifacts/real-minecraft/gui.log
 test -s artifacts/real-minecraft/live-block-outside.png
