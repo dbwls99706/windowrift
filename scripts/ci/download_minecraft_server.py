@@ -29,7 +29,17 @@ def main():
     path=Path(os.environ.get('RUNNER_TEMP','/tmp'))/'windowrift-real-minecraft-server.jar'
     path.write_bytes(payload)
     print('OFFICIAL_MOJANG_SERVER_VERIFIED='+json.dumps({'version':VERSION,'sha1':digest,'size':len(payload)}),flush=True)
+    client = detail['downloads']['client']
+    client_data = fetch(client['url'])
+    client_digest = hashlib.sha1(client_data).hexdigest()
+    if client_digest != client['sha1']:
+        raise RuntimeError('Official Minecraft client jar checksum mismatch')
+    client_path = Path(os.environ.get('RUNNER_TEMP','/tmp'))/'windowrift-real-minecraft-client.jar'
+    client_path.write_bytes(client_data)
+    print('OFFICIAL_MOJANG_CLIENT_TEXTURES_VERIFIED='+json.dumps(
+        {'version':VERSION,'sha1':client_digest,'size':len(client_data)}),flush=True)
     with open(os.environ.get('GITHUB_ENV','/dev/null'),'a') as f:
         f.write('WR_MINECRAFT_SERVER='+str(path)+'\n')
+        f.write('WR_MINECRAFT_CLIENT='+str(client_path)+'\n')
 
 if __name__=='__main__':main()

@@ -35,3 +35,28 @@ cd "$GITHUB_WORKSPACE"
 export WINDOWRIFT_RCON_PASSWORD='windowrift-ci-only-no-external-access-2026'
 PYTHONPATH=src python scripts/ci/real_minecraft_roundtrip.py | tee artifacts/real-minecraft/results.log
 test -s artifacts/real-minecraft/proof.json
+
+# Show the live, game-backed object in a *real* X11 native Qt desktop window.
+# The Minecraft client JAR is read from a temporary runner path for textures.
+export DISPLAY=:96
+Xvfb :96 -screen 0 1600x900x24 -nolisten tcp \
+  > artifacts/real-minecraft/xvfb.log 2>&1 &
+xpid=$!
+for i in $(seq 1 40); do
+  if xprop -root >/dev/null 2>&1; then break; fi
+  sleep 0.2
+done
+xprop -root >/dev/null 2>&1 || { echo 'Xvfb did not start'; exit 1; }
+openbox > artifacts/real-minecraft/openbox.log 2>&1 &
+wpid=$!
+for i in $(seq 1 40); do
+  if xprop -root _NET_SUPPORTED 2>/dev/null | grep -q _NET_CLIENT_LIST; then break; fi
+  sleep 0.2
+done
+xprop -root _NET_SUPPORTED 2>/dev/null | grep -q _NET_CLIENT_LIST || { echo 'No window manager'; exit 1; }
+export QT_QPA_PLATFORM=xcb
+python scripts/ci/real_minecraft_gui_proof.py \
+  | tee artifacts/real-minecraft/gui.log
+test -s artifacts/real-minecraft/live-block-outside.png
+test -s artifacts/real-minecraft/live-block-returned.png
+kill "$wpid" "$xpid" 2>/dev/null || true
