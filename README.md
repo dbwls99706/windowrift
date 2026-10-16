@@ -1,5 +1,56 @@
 # WindowRift
 
+## Experimental: real Minecraft Java world → desktop → world
+
+**This is a separate, state-backed adapter.** It moves an *actual Minecraft
+Java Edition 1.21.1 world block*, not a cutout PNG. WindowRift uses an
+authenticated **loopback RCON connection** to an independently owned local
+vanilla server. It copies the block, with its original block-state properties,
+to an empty reserved in-world vault and clears its source. A native desktop
+widget represents the same tracked ID. On return, Minecraft restores the
+saved game block from that vault at the chosen destination, then clears the
+vault. The original identity survives another pickup/return cycle.
+
+![Visual demo from the older Minecraft Classic branch, not a state-backed Java world transfer](docs/media/minecraft-anywhere-x11.gif)
+
+**Do not mistake the GIF above for the new world's integration proof:** it is
+a legacy Minecraft Classic visual overlay. The **new** actual-world experiment
+is verified separately by
+[real Minecraft server handoff CI](.github/workflows/real-minecraft.yml).
+That workflow uses an official ephemeral Mojang server, checks the game data
+hash, and tests that an east-facing stair actually disappears and reappears
+with the same block orientation. It does not distribute Minecraft files.
+
+To run the actual game-backed version, connect your Minecraft Java Edition
+client to your **own local vanilla 1.21.1 RCON-enabled server** (not an
+unmodified single-player instance), then:
+
+```bash
+# Set a private RCON password using a shell prompt, not a CLI argument.
+read -rs -p 'Local RCON password: ' WINDOWRIFT_RCON_PASSWORD; echo
+export WINDOWRIFT_RCON_PASSWORD
+
+# Set up a real test block in the Minecraft world first (Creative mode):
+# /setblock 10 70 10 minecraft:oak_stairs[facing=east,half=bottom]
+windowrift-mc take --at 10,70,10 --material minecraft:oak_stairs
+
+# Optional: read real block textures from your owned client jar.
+windowrift-real --game-jar "$HOME/.minecraft/versions/1.21.1/1.21.1.jar"
+
+# Returning a block actually changes the Minecraft world:
+windowrift-mc list
+windowrift-mc put YOUR_OBJECT_UUID --at 14,70,10
+```
+
+Back up your test world first. Only basic whitelisted blocks are
+supported. Desktop physics and arbitrary game engines are **not** implemented;
+the out-of-window object is an interactive native visualization backed by
+real game state. **No unsupported images or textures are embedded.**
+See the [real-state setup, permissions and recovery guide](docs/MINECRAFT_REAL_STATE.md).
+
+---
+
+
 **Make a game character walk out of its window and across Chrome's actual address bar.**
 
 WindowRift captures an object from a visible application and renders it in an independent transparent desktop window. You can drag it, enable live pixels, or send it across the real Chrome/Chromium omnibox. The native overlay is shaped and leaves the browser keyboard/mouse input usable; no fake browser window or screenshot compositing is required.

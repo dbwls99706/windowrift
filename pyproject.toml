@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "windowrift-desktop"
-version = "0.9.0"
+version = "0.10.0"
 description = "Pull objects out of application windows and let them interact with your desktop and browser."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -26,6 +26,8 @@ dev = ["pytest>=8,<10", "ruff>=0.9,<1"]
 
 [project.scripts]
 windowrift = "windowrift.app:main"
+windowrift-mc = "windowrift.minecraft_cli:main"
+windowrift-real = "windowrift.minecraft_desktop:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
