@@ -1,0 +1,47 @@
+name: Real Minecraft native mob
+on:
+  push:
+    paths:
+      - '.github/workflows/real-mob.yml'
+      - 'src/windowrift/minecraft_mobs.py'
+      - 'src/windowrift/minecraft_mob_desktop.py'
+      - 'src/windowrift/mob_render.py'
+      - 'src/windowrift/portal_api.py'
+      - 'src/windowrift/minecraft_adapters.py'
+      - 'scripts/ci/real_mob_roundtrip.py'
+      - 'scripts/ci/real-mob.sh'
+      - 'tests/test_minecraft_mobs.py'
+      - 'tests/test_portal_api.py'
+      - 'tests/test_mob_render.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-mob:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies and run native-state tests
+        run: |
+          python -m pip install -e '.[dev]'
+          python -m compileall -q src/windowrift scripts/ci
+          python -m pytest -q tests/test_minecraft_mobs.py tests/test_portal_api.py tests/test_mob_render.py
+      - name: Download verified original Minecraft 1.21.1 server/client
+        run: python scripts/ci/download_minecraft_server.py
+      - name: Test the SAME living Minecraft entity across native transfers
+        run: bash scripts/ci/real-mob.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-minecraft-mob-roundtrip
+          path: artifacts/real-mob/
+          retention-days: 14
+          if-no-files-found: warn
