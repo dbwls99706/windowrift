@@ -36,6 +36,23 @@ Take a visible block from the **official Minecraft Classic game running in Chrom
 
 This is **keyboard-controlled**, not a timed animation; the browser changes its actual DOM rather than only counting collisions. The original Minecraft world is **read-only** and the browser arena is an explicit local opt-in. [Setup and verification guide](docs/MINECRAFT_PLAY.md) · [Automated real-game keyboard test](.github/workflows/minecraft-play.yml).
 
+## New: Minecraft blocks anywhere on the actual desktop
+
+**Build on an unrelated website, on Chrome's own address bar, or on empty desktop space.** Open the [official Minecraft Classic](https://classic.minecraft.net/) in one Chrome window and any normal website (Wikipedia, GitHub, anything) in another. WindowRift samples *actual Minecraft hotbar pixels* and draws blocks in an independent **native OS layer**, not inside the website's DOM.
+
+Hold the **left mouse button** to paint a bridge across windows, use **right-click** to mine, **1–8** to switch materials, **Z/Y** to undo/redo, and **Esc** to release the mouse back to the browser. The placed blocks stay visible when the web page changes and persist as desktop screen coordinates.
+
+```bash
+# Linux X11, live Minecraft Classic game at 100% browser scaling
+sudo apt install python3-tk wmctrl x11-utils
+pip install -e .
+python examples/minecraft_desktop_builder.py
+```
+
+[Desktop building tutorial, limitations and actual-game proof](docs/MINECRAFT_DESKTOP.md) · [UNDERTALE official demo: visual actor escape scope](docs/UNDERTALE_ESCAPE.md)
+
+**Important:** these are OS-level visual Minecraft blocks, not edits to the game's internal world, and the website does not gain new HTML elements. The pointer is intercepted only while explicit Build Mode is active.
+
 ## Chrome omnibox: recorded from actual running windows
 
 ![Actual X11 recording: the playable game source, an OS-level actor crossing to Chromium's native address/search bar, and real keyboard input in the omnibox.](docs/media/omnibox-handoff.gif)

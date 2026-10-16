@@ -1,0 +1,41 @@
+name: Minecraft outside any website
+on:
+  push:
+    paths:
+      - '.github/workflows/desktop-world.yml'
+      - 'src/windowrift/desktop_world.py'
+      - 'src/windowrift/x11_pointer.py'
+      - 'examples/minecraft_desktop_builder.py'
+      - 'examples/chrome_omnibox_demo.py'
+      - 'scripts/ci/desktop-world.sh'
+      - 'scripts/ci/desktop_world_check.py'
+      - 'scripts/ci/real_site_probe.py'
+      - 'scripts/ci/minecraft_check.py'
+      - 'scripts/ci/minecraft_world_ready.py'
+      - 'tests/test_desktop_world.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  desktop-world:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare real Chrome, X11 and window-scene dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends xvfb openbox wmctrl xdotool x11-utils python3-venv python3-tk libegl1 libopengl0 libxcb-cursor0 libxkbcommon-x11-0
+          python3 -m venv .venv
+          .venv/bin/python -m pip install -e '.[dev]'
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+          command -v google-chrome
+      - name: Build over real external websites with actual Minecraft pixels and X11 mouse events
+        run: bash scripts/ci/desktop-world.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: minecraft-blocks-anywhere-native-desktop
+          path: artifacts/desktop-world/
+          if-no-files-found: warn
+          retention-days: 7
