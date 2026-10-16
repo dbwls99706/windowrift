@@ -38,7 +38,7 @@ def uuid_from_nbt(text: str) -> str:
 def position_from_nbt(text: str) -> tuple[float, float, float]:
     found = POS_PATTERN.search(text)
     if found is None:
-        raise TransferError("Native Minecraft entity position could not be read")
+        raise TransferError("Native Minecraft entity position could not be read: " + text[:220])
     result = tuple(float(n) for n in found.groups())
     if not all(math.isfinite(v) and abs(v) < 30000000 for v in result):
         raise TransferError("Invalid native entity position")
