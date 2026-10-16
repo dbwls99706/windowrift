@@ -1,3 +1,12 @@
+
+## Minecraft Classic 실시간 조작 시연
+
+![실제 Minecraft Classic을 실행하고 키보드로 블록을 조종해 Chrome HTML을 부수고 배치하는 GIF](media/minecraft-keyboard-play.gif)
+
+실행 중인 공식 Minecraft Classic에서 보이는 블록 이미지를 선택해 데스크톱 객체로 띄운다. **A/D** 이동, **Space** 점프, **Shift** 달리기, **E**로 Chrome 페이지의 HTML 블록 파괴, **F**로 새 HTML 블록 배치를 할 수 있다. 변경된 DOM은 새로고침해도 유지된다.
+
+이 시연은 실제 X11 키 입력으로 재현했으며, 원본 Minecraft 월드 데이터는 수정하지 않는다. [영문 실행 안내](MINECRAFT_PLAY.md)에서 브라우저 연결과 테스트 절차를 확인할 수 있다.
+
 # WindowRift 한국어 가이드
 
 WindowRift는 실행 중인 프로그램의 **보이는 화면 속 객체를 데스크톱 위로 꺼내는 시각적 실험 도구**이다. 선택한 창을 캡처하고 객체를 잘라낸 다음, 독립적인 투명 창으로 띄워 드래그하고 중력·창 경계 충돌을 적용한다.

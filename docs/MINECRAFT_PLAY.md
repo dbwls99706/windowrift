@@ -1,5 +1,8 @@
 # Minecraft Classic: playable cross-window experiment
 
+![Actual keyboard-driven Minecraft Classic to Chrome DOM interactions](media/minecraft-keyboard-play.gif)
+
+
 This experiment uses the **official Minecraft Classic website running in a
 real Chrome/Chromium window** and a separately hosted HTML playground in a
 second browser window. WindowRift selects a block from Minecraft's visible

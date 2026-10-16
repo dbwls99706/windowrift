@@ -27,6 +27,11 @@ overlay, not a modification of the game process or an export of its live AI.
 
 ## Minecraft Classic: mine and build real browser elements
 
+![Real official Minecraft Classic, a block under actual X11 keyboard control, and Chrome HTML blocks mined and placed](docs/media/minecraft-keyboard-play.gif)
+
+*Real desktop recording from the verified Minecraft integration test; the recording is cropped and palette-reduced for README playback. CI sends OS keyboard events to the same playable controller used by people. [Full-resolution capture and evidence](https://github.com/dbwls99706/windowrift/actions/runs/38832879394).*
+
+
 Take a visible block from the **official Minecraft Classic game running in Chrome**, then play it across the desktop with A/D, Space and Shift. In the separately opened [Block Arena](examples/minecraft-rift.html), **E removes actual HTML blocks** and **F creates new DOM blocks** textured with the captured game pixels. Reloading the page preserves mined and built blocks.
 
 This is **keyboard-controlled**, not a timed animation; the browser changes its actual DOM rather than only counting collisions. The original Minecraft world is **read-only** and the browser arena is an explicit local opt-in. [Setup and verification guide](docs/MINECRAFT_PLAY.md) · [Automated real-game keyboard test](.github/workflows/minecraft-play.yml).
