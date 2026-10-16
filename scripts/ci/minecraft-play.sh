@@ -36,6 +36,11 @@ google-chrome --no-sandbox --no-first-run --no-default-browser-check \
   --window-size=735,680 --window-position=825,90 \
   'http://127.0.0.1:8811/minecraft-rift.html' >artifacts/minecraft-play/lab.log 2>&1 & labpid=$!
 python scripts/ci/minecraft_check.py | tee artifacts/minecraft-play/game-proof.log
+# A visible canvas can still be the level-generation loading screen. Wait for
+# actual sky and terrain before choosing an item from the Minecraft hotbar.
+python scripts/ci/minecraft_world_ready.py \
+  --screenshot artifacts/minecraft-play/minecraft-world-ready.png \
+  | tee artifacts/minecraft-play/world-proof.log
 export WINDOWRIFT_BRIDGE_TOKEN="$(openssl rand -hex 24)"
 python examples/minecraft_play_demo.py \
   --token "$WINDOWRIFT_BRIDGE_TOKEN" --duration 14 \

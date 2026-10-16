@@ -8,6 +8,8 @@ on:
       - 'examples/minecraft-rift.js'
       - 'scripts/ci/minecraft-play.sh'
       - 'scripts/ci/block_arena_check.py'
+      - 'scripts/ci/minecraft_world_ready.py'
+      - 'tests/test_minecraft_world_ready.py'
       - 'src/windowrift/controller.py'
       - 'src/windowrift/bridge.py'
       - 'src/windowrift/windows.py'

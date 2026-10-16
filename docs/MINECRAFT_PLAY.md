@@ -42,7 +42,8 @@ original four HTML blocks.
 ## Evidence and limitations
 
 The GitHub Actions `Minecraft playable cross-window demo` runs Chrome with
-Minecraft Classic, injects **real X11 key events** into the same Tk controller,
+Minecraft Classic, waits for actual sky/terrain rather than a level-generation
+loading screen, injects **real X11 key events** into the same Tk controller,
 checks actual DOM nodes have been deleted and created, reloads the page to
 check persistence, and records a real-desktop GIF. This is scripted **human
 input emulation** for repeatable CI, not a claim that a human manually operated

@@ -100,7 +100,7 @@ class MinecraftPlay:
         self.shape.apply(self.picture)
 
         root.title("WindowRift Play Controller")
-        root.geometry("540x156+540+14")
+        root.geometry("540x138+530+753")
         root.configure(bg="#1b2626")
         root.attributes("-topmost", True)
         title = tk.Label(root, text="MINECRAFT  /  CROSS-WINDOW PLAY", font=("DejaVu Sans Mono", 14, "bold"),
@@ -209,7 +209,7 @@ def main() -> None:
     parser.add_argument("--browser-title", default="WindowRift Block Arena")
     parser.add_argument("--crop", type=parse_crop, default=(290, 636, 36, 40))
     parser.add_argument("--mode", choices=("grabcut", "color-key", "ai", "crop"), default="grabcut")
-    parser.add_argument("--actor-height", type=int, default=62)
+    parser.add_argument("--actor-height", type=int, default=84)
     parser.add_argument("--token", required=True)
     parser.add_argument("--gif", type=Path)
     parser.add_argument("--duration", type=float, default=0,
