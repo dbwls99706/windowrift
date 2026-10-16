@@ -22,6 +22,7 @@ class FakeGame:
         }
         self.outage = None
         self.duplicate = False
+        self.scoreboard = {}
     def matches(self, sel):
         return self.mob and all(
             t in self.mob["tags"] for t in re.findall(r"tag=([^,\]]+)", sel)
@@ -34,6 +35,27 @@ class FakeGame:
         cmd = command[len(prefix):]
         if self.outage and self.outage in cmd:
             raise RuntimeError("Simulated Minecraft disconnect")
+        if cmd.startswith("scoreboard objectives add "):
+            return "Created new objective"
+        if cmd.startswith("scoreboard players set "):
+            _, _, _, key, obj, value = cmd.split(" ")
+            assert obj == "wr_mobs"
+            self.scoreboard[key] = int(value)
+            return "Set score"
+        if cmd.startswith("execute as "):
+            match = re.fullmatch(
+                r"execute as (.+) run scoreboard players add (#[0-9a-z]+) wr_mobs 1",
+                cmd,
+            )
+            assert match
+            selector, holder = match.groups()
+            if self.matches(selector):
+                self.scoreboard[holder] += 2 if self.duplicate else 1
+            return "Score updated"
+        if cmd.startswith("scoreboard players get "):
+            _, _, _, holder, objective = cmd.split(" ")
+            assert objective == "wr_mobs"
+            return f"{holder} has {self.scoreboard[holder]} [wr_mobs]"
         if cmd.startswith("forceload add "):
             return "Marked chunk as force loaded"
         if cmd.startswith("execute if block "):

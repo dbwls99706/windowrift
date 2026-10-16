@@ -7,6 +7,7 @@ desktop visual is a separate model and must be described honestly.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+import hashlib
 import json
 import math
 from pathlib import Path
@@ -57,6 +58,8 @@ def result_count(text: str) -> int:
     found = re.search(r"Test passed, count: (\d+)", text)
     if found is not None:
         return int(found.group(1))
+    if text.strip() == "Test passed":
+        return 1
     if "Test failed" in text:
         return 0
     raise TransferError("Unrecognized Minecraft entity or block query result: " + text[:100])
@@ -154,7 +157,25 @@ class MinecraftMobs:
         return f"@e[type={record.entity_type},tag={record.bridge_tag},limit=1]"
 
     def _count(self, selector: str) -> int:
-        return result_count(self._command(f"execute if entity {selector}"))
+        """Read an unambiguous count from Minecraft's scoreboard, never guess.
+
+        Vanilla 1.21.1 prints only 'Test passed' for execute-if-entity even
+        when more than one entity matched, so a boolean is NOT a unique count.
+        """
+        key = "#wr" + hashlib.sha256(selector.encode("utf-8")).hexdigest()[:12]
+        # The objective is intentionally shared; distinct selectors use distinct
+        # holders. RCON requests are serialized per client.
+        self._command("scoreboard objectives add wr_mobs dummy")
+        self._command(f"scoreboard players set {key} wr_mobs 0")
+        self._command(
+            f"execute as {selector} run scoreboard players add {key} wr_mobs 1"
+        )
+        response = self._command(f"scoreboard players get {key} wr_mobs")
+        found = re.search(r"\bhas\s+(\d+)\s+\[wr_mobs\]", response)
+        if found is None:
+            raise TransferError("Minecraft did not confirm exact entity count: "
+                                + response[:120])
+        return int(found.group(1))
 
     def _get(self, selector: str, field: str) -> str:
         return self._command(f"data get entity {selector} {field}")
