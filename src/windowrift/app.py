@@ -5,10 +5,10 @@ from __future__ import annotations
 import sys
 import time
 from concurrent.futures import Future, ThreadPoolExecutor
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from PIL import Image
-from PySide6.QtCore import QObject, QThreadPool, QTimer, QRunnable, Signal
+from PySide6.QtCore import QObject, QThreadPool, QTimer, QRunnable, Signal, Qt, QEvent
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QHBoxLayout, QLabel,
@@ -18,7 +18,8 @@ from PySide6.QtWidgets import (
 from .bridge import BrowserBridge
 from .capture import capture_region, capture_window_with_origin
 from .crop_dialog import CropDialog
-from .geometry import Rect, advance
+from .geometry import Rect, ActorState, advance
+from .controller import KeyLatch, Player, step, surfaces_for_windows
 from .omnibox import OmniboxCalibration, looks_like_chrome
 from .choreography import cinematic_pose, scene_duration
 from .live import SourceCrop, composite_live_frame, overlaps, tracking_region
@@ -78,6 +79,9 @@ class ControlPanel(QWidget):
         self._next_actor_id = 1
         self._live_sources: dict[int, LiveBinding] = {}
         self._browser_docks: dict[int, BrowserDock] = {}
+        self._play_id: int | None = None
+        self._player: Player | None = None
+        self._keys = KeyLatch()
         self._omnibox = OmniboxCalibration()
         self._live_executor = ThreadPoolExecutor(max_workers=1)
         self._live_future: Future[tuple[int, Image.Image | None, SourceCrop | None]] | None = None
@@ -143,6 +147,14 @@ class ControlPanel(QWidget):
         root.addWidget(self.extract_button)
 
         row2 = QHBoxLayout()
+        self.control_button = QPushButton("Take control of latest actor")
+        self.control_button.setObjectName("primary")
+        self.control_button.clicked.connect(self.toggle_control)
+        root.addWidget(self.control_button)
+        hint = QLabel("PLAY: A/D or arrows move · Space/W jump · Shift sprint · S+Space drop · Esc release")
+        hint.setObjectName("muted")
+        hint.setWordWrap(True)
+        root.addWidget(hint)
         self.pause_button = QPushButton("Pause physics")
         self.pause_button.clicked.connect(self.toggle_pause)
         clear_button = QPushButton("Remove all objects")
@@ -206,6 +218,7 @@ class ControlPanel(QWidget):
             QPushButton#primary { background: #159da5; color: #ffffff; font-weight: bold; }
         """)
         self.refresh_windows()
+        QApplication.instance().installEventFilter(self)
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.tick)
         self.timer.start(16)
@@ -345,6 +358,8 @@ class ControlPanel(QWidget):
             self.status.setText(str(error))
             return
         sprite = self.sprites[-1]
+        if self._play_id is not None:
+            self.stop_control()
         if sprite.actor_id in self._browser_docks:
             self.release_from_chrome()
         original_height = sprite.height()
@@ -371,11 +386,79 @@ class ControlPanel(QWidget):
             sprite.state.vy = 40.0
         self.status.setText("Released browser actors back to desktop physics.")
 
+    def toggle_control(self) -> None:
+        """Direct keyboard control, with a visible opt-in and no global hook."""
+        if self._play_id is not None:
+            self.stop_control()
+            return
+        if not self.sprites:
+            self.status.setText("Capture a character first.")
+            return
+        if self._browser_docks:
+            self.release_from_chrome()
+        sprite = self.sprites[-1]
+        target = self._known_windows.get(self.selected.wid) if self.selected else None
+        x, y, ground = sprite.state.x, sprite.state.y, None
+        if target is not None:
+            x = max(target.bounds.x + 4, min(x, target.bounds.right - sprite.width() - 4))
+            y = target.bounds.y - sprite.height()
+            ground = f"window:{target.wid}"
+        self._play_id = sprite.actor_id
+        self._player = Player(x,y,float(sprite.width()),float(sprite.height()),ground=ground)
+        self._keys.clear()
+        self.paused = False
+        self.pause_button.setText("Pause physics")
+        sprite.set_input_passthrough(True)
+        sprite.state = ActorState(x,y,float(sprite.width()),float(sprite.height()),0,0)
+        sprite.move(round(x),round(y))
+        self.control_button.setText("Stop playing (Esc)")
+        self.status.setText("Controls active. Focus this panel: A/D walk, Space jump, Shift run, S+Space drop, Esc exit.")
+        self.activateWindow()
+        self.setFocus(Qt.FocusReason.OtherFocusReason)
+
+    def stop_control(self) -> None:
+        if self._play_id is None:
+            return
+        for sprite in self.sprites:
+            if sprite.actor_id == self._play_id:
+                sprite.set_input_passthrough(False)
+                sprite.set_visual_pose(0.0, 1.0)
+                sprite.state.vx = sprite.state.vy = 0
+        self._play_id = None
+        self._player = None
+        self._keys.clear()
+        self.control_button.setText("Take control of latest actor")
+        self.status.setText("Play mode off. Normal desktop input restored.")
+
+    def eventFilter(self, watched, event):
+        if self._play_id is not None:
+            typ = event.type()
+            if typ in (QEvent.Type.KeyPress,QEvent.Type.KeyRelease):
+                mapping = {
+                    Qt.Key.Key_A: "a", Qt.Key.Key_Left: "left", Qt.Key.Key_D: "d",
+                    Qt.Key.Key_Right: "right", Qt.Key.Key_S: "s", Qt.Key.Key_Down: "down",
+                    Qt.Key.Key_Space: "space", Qt.Key.Key_W: "w", Qt.Key.Key_Up: "up",
+                    Qt.Key.Key_Shift: "shift",
+                }
+                if typ == QEvent.Type.KeyPress and event.key() == Qt.Key.Key_Escape:
+                    self.stop_control()
+                    return True
+                name = mapping.get(event.key())
+                if name is not None:
+                    if not event.isAutoRepeat():
+                        if typ == QEvent.Type.KeyPress:self._keys.press(name)
+                        else:self._keys.release(name)
+                    return True
+            if typ == QEvent.Type.WindowDeactivate:self._keys.clear()
+        return super().eventFilter(watched,event)
+
     def toggle_pause(self):
         self.paused = not self.paused
         self.pause_button.setText("Resume physics" if self.paused else "Pause physics")
 
     def remove_sprite(self, sprite: Sprite):
+        if sprite.actor_id == self._play_id:
+            self.stop_control()
         self._browser_docks.pop(sprite.actor_id, None)
         self._live_sources.pop(sprite.actor_id, None)
         if sprite in self.sprites:
@@ -442,6 +525,16 @@ class ControlPanel(QWidget):
                             continue
                         sprite.state.x, sprite.state.y = float(x), float(y)
                         sprite.move(x, y)
+                    continue
+                if sprite.actor_id == self._play_id and self._player is not None:
+                    self._player = replace(self._player,width=float(sprite.width()),height=float(sprite.height()))
+                    self._player = step(self._player,self._keys.snapshot(),dt,desktop,
+                                        surfaces_for_windows(list(self._known_windows.values())))
+                    sprite.state = ActorState(self._player.x,self._player.y,
+                                              self._player.width,self._player.height,
+                                              self._player.vx,self._player.vy)
+                    sprite.set_visual_pose(max(-8,min(8,self._player.vx*.018)),1.)
+                    sprite.move(round(self._player.x),round(self._player.y))
                     continue
                 if sprite.dragging:
                     continue
@@ -529,6 +622,8 @@ class ControlPanel(QWidget):
         return actor_id, composite_live_frame(frame, matte), new_crop
 
     def closeEvent(self, event):
+        self.stop_control()
+        QApplication.instance().removeEventFilter(self)
         self.timer.stop()
         self.clear_sprites()
         self.bridge.stop()

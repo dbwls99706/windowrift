@@ -6,6 +6,25 @@ WindowRift captures an object from a visible application and renders it in an in
 
 **Scope:** for arbitrary applications this is a visual overlay, *not* a transfer of executable game objects or state. The bundled playable Rift Arcade has a small opt-in localhost adapter that also hides its original sprite during the demo and restores it afterward. Other games remain unchanged. Chrome's browser-owned address bar cannot be modified through web-page DOM APIs.
 
+## Direct play: keyboard-controlled, not an automatic animation
+
+Capture an object in \`windowrift\` and choose **Take control of latest actor**.
+Movement now follows real keyboard input and platform physics; the old timed
+Chrome cinematic remains optional and separate.
+
+| Keys | Action |
+| --- | --- |
+| \`A\` / \`D\` or \`←\` / \`→\` | Steer left and right |
+| \`Space\`, \`W\`, \`↑\` | Jump from a window or Chrome address-bar ledge |
+| Hold \`Shift\` | Sprint |
+| \`S\` + \`Space\` or \`↓\` + \`Space\` | Drop down through a ledge |
+| \`Esc\` | Exit manual play mode |
+
+Only the focused WindowRift control panel receives gameplay keys. This is
+**not a global keylogger**, and ordinary typing in Chrome stays unaffected.
+For arbitrary programs the extracted actor is still an OS-level visual
+overlay, not a modification of the game process or an export of its live AI.
+
 ## Chrome omnibox: recorded from actual running windows
 
 ![Actual X11 recording: the playable game source, an OS-level actor crossing to Chromium's native address/search bar, and real keyboard input in the omnibox.](docs/media/omnibox-handoff.gif)

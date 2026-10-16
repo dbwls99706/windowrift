@@ -64,3 +64,51 @@ def test_chrome_portal_changes_actor_geometry_and_restores(monkeypatch):
     finally:
         panel.close()
     assert app is not None
+
+
+def test_keyboard_play_moves_actor_when_keys_are_pressed(monkeypatch):
+    import time
+    from PIL import Image
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+    from PySide6.QtWidgets import QApplication
+    import windowrift.app as ui
+    from windowrift.geometry import Rect
+    from windowrift.windows import AppWindow
+
+    class BridgeStub:
+        token = "test-local-browser-session-token"
+        error = None
+        def start(self): pass
+        def stop(self): pass
+        def publish_actors(self, actors): pass
+
+    source = AppWindow(15,"Example source",Rect(130,290,440,420))
+    browser = AppWindow(19,"Search - Google Chrome",Rect(650,190,720,650))
+    monkeypatch.setattr(ui,"BrowserBridge",BridgeStub)
+    monkeypatch.setattr(ui,"list_windows",lambda:[source,browser])
+    app=QApplication.instance() or QApplication([])
+    panel=ui.ControlPanel()
+    sprite=ui.Sprite(Image.new('RGBA',(50,60),(40,180,220,255)),320,470,60)
+    sprite.actor_id=42
+    panel.sprites.append(sprite)
+    panel.selected=source
+    try:
+        panel.toggle_control()
+        assert panel._play_id==42
+        before=sprite.state.x
+        QTest.keyPress(panel,Qt.Key.Key_D)
+        panel._last=time.monotonic()-.04
+        panel.tick()
+        assert sprite.state.x>before
+        QTest.keyPress(panel,Qt.Key.Key_Space)
+        panel._last=time.monotonic()-.04
+        panel.tick()
+        assert panel._player.jumps==1
+        QTest.keyRelease(panel,Qt.Key.Key_Space)
+        QTest.keyRelease(panel,Qt.Key.Key_D)
+        QTest.keyPress(panel,Qt.Key.Key_Escape)
+        assert panel._play_id is None
+    finally:
+        panel.close()
+    assert app is not None
