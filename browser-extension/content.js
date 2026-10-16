@@ -49,10 +49,20 @@
     if (!Number.isInteger(actor.id) || ![actor.x, actor.y, actor.width, actor.height].every(Number.isFinite)) return;
     if (actor.width <= 0 || actor.height <= 0) return;
     const origin = viewportTopLeft();
-    const x = actor.x + actor.width / 2 - origin.x;
-    const y = actor.y + actor.height / 2 - origin.y;
-    const element = x >= 0 && x < innerWidth && y >= 0 && y < innerHeight
-      ? chooseTarget(x, y) : null;
+    const left = actor.x - origin.x, top = actor.y - origin.y;
+    const probes = [
+      [left + actor.width / 2, top + actor.height - 1],
+      [left + actor.width - 1, top + actor.height - 1],
+      [left + 1, top + actor.height - 1],
+      [left + actor.width / 2, top + actor.height / 2],
+    ];
+    let element = null;
+    for (const [x, y] of probes) {
+      if (x >= 0 && x < innerWidth && y >= 0 && y < innerHeight) {
+        element = chooseTarget(x, y);
+        if (element) break;
+      }
+    }
     const previous = activeTargets.get(actor.id);
     if (element === null) {
       activeTargets.delete(actor.id);

@@ -55,11 +55,12 @@ function handleActors(actors) {
   for (const actor of actors.slice(0, 128)) {
     if (!Number.isInteger(actor.id) || ![actor.x, actor.y, actor.width, actor.height].every(Number.isFinite)) continue;
     if (actor.width <= 0 || actor.height <= 0) continue;
-    const x = actor.x + actor.width / 2 - origin.x;
-    const y = actor.y + actor.height / 2 - origin.y;
+    // Contact begins when the actor's feet or body touch an element.
+    const left = actor.x - origin.x, top = actor.y - origin.y;
+    const right = left + actor.width, bottom = top + actor.height;
     const next = targets.find(el => {
       const r = el.getBoundingClientRect();
-      return x >= r.left && x < r.right && y >= r.top && y < r.bottom;
+      return left < r.right && right > r.left && top < r.bottom && bottom > r.top;
     }) || null;
     ids.add(actor.id);
     if (next && previouslyInside.get(actor.id) !== next) {

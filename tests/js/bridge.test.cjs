@@ -27,7 +27,7 @@ function setup() {
   }
   const ctx = {
     chrome: { runtime: { onMessage: { addListener: fn => { listener = fn; } } } },
-    document: { elementsFromPoint: (x, y) => x < 100 && y < 100 ? [target] : [] },
+    document: { elementsFromPoint: (x, y) => x >= 10 && x < 90 && y >= 10 && y < 80 ? [target] : [] },
     window: { screenX: 0, screenY: 0, outerWidth: 400, innerWidth: 400,
       outerHeight: 400, innerHeight: 400 },
     innerWidth: 400, innerHeight: 400,
@@ -69,4 +69,13 @@ test('malformed actor payloads are ignored without changing DOM', () => {
   s.send([{id: 1, x: Number.NaN, y: 0, width: 20, height: 20}]);
   assert.equal(s.events.length,0);
   assert.equal(s.target.style.transform,'scale(1)');
+});
+
+test('character feet trigger contact while center is outside the target', () => {
+  const ctx=setup();
+  ctx.onCommand({type:'WINDOWRIFT_START',token:'test-secret'});
+  ctx.send([{id:6,x:-15,y:20,width:30,height:30}]);
+  assert.equal(ctx.events.length,1);
+  ctx.send([{id:6,x:-15,y:20,width:30,height:30}]);
+  assert.equal(ctx.events.length,1);
 });
