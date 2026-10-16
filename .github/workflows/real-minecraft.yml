@@ -1,0 +1,48 @@
+name: real Minecraft world handoff
+on:
+  push:
+    paths:
+      - '.github/workflows/real-minecraft.yml'
+      - 'src/windowrift/minecraft_transfer.py'
+      - 'src/windowrift/minecraft_rcon.py'
+      - 'src/windowrift/minecraft_cli.py'
+      - 'src/windowrift/minecraft_textures.py'
+      - 'scripts/ci/real-minecraft.sh'
+      - 'scripts/ci/real_minecraft_roundtrip.py'
+      - 'scripts/ci/download_minecraft_server.py'
+      - 'tests/test_minecraft_transfer.py'
+      - 'tests/test_minecraft_rcon.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-world:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test state machine and RCON transport
+        run: |
+          python -m pip install pytest Pillow
+          PYTHONPATH=src pytest -q tests/test_minecraft_transfer.py tests/test_minecraft_rcon.py tests/test_minecraft_textures.py tests/test_minecraft_cli.py
+      - name: Fetch original Minecraft 1.21.1 server and verify checksum
+        run: python scripts/ci/download_minecraft_server.py
+      - name: Transfer original world block out and back with its state
+        run: bash scripts/ci/real-minecraft.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: real-minecraft-world-state-proof
+          path: |
+            artifacts/real-minecraft/proof.json
+            artifacts/real-minecraft/results.log
+            artifacts/real-minecraft/server.log
+          retention-days: 14
+          if-no-files-found: warn
