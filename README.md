@@ -38,6 +38,10 @@ This is **keyboard-controlled**, not a timed animation; the browser changes its 
 
 ## New: Minecraft blocks anywhere on the actual desktop
 
+![Recorded Minecraft Classic blocks placed directly over Wikipedia, the real Chrome address bar, and example.com](docs/media/minecraft-anywhere-x11.gif)
+
+**Real, independently verified desktop recording:** official Minecraft Classic on the left, an unrelated live Wikipedia article on the right, actual X11 mouse building and mining, followed by changing that browser to example.com without moving the blocks. The websites were not modified. [Wikipedia screenshot](docs/media/minecraft-anywhere-wikipedia.png) · [Example.com screenshot](docs/media/minecraft-anywhere-example-com.png) · [Successful source/website verification](https://github.com/dbwls99706/windowrift/actions/runs/38836891816).
+
 **Build on an unrelated website, on Chrome's own address bar, or on empty desktop space.** Open the [official Minecraft Classic](https://classic.minecraft.net/) in one Chrome window and any normal website (Wikipedia, GitHub, anything) in another. WindowRift samples *actual Minecraft hotbar pixels* and draws blocks in an independent **native OS layer**, not inside the website's DOM.
 
 Hold the **left mouse button** to paint a bridge across windows, use **right-click** to mine, **1–8** to switch materials, **Z/Y** to undo/redo, and **Esc** to release the mouse back to the browser. The placed blocks stay visible when the web page changes and persist as desktop screen coordinates.

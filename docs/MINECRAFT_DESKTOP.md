@@ -66,6 +66,10 @@ browser and survives page reloads or navigation.
 
 ## Real-game, real-website integration proof
 
+![Actual Minecraft Classic native blocks surviving navigation from an unrelated Wikipedia article to example.com](../docs/media/minecraft-anywhere-x11.gif)
+
+[Actual Wikipedia screenshot](media/minecraft-anywhere-wikipedia.png) · [After navigation to example.com](media/minecraft-anywhere-example-com.png). The 90 source frames are successive screenshots from the original X11 desktop; the README animation only downsamples resolution, frame count and palette for size. This is *not* a synthetic recreation or an HTML overlay.
+
 The CI workflow `Minecraft outside any website` opens two real Chromium windows
 on X11. The source loads the official Minecraft Classic world; the destination
 loads a public, Minecraft-unrelated Wikipedia article. CI uses actual X11

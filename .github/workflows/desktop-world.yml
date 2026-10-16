@@ -13,9 +13,10 @@ on:
       - 'scripts/ci/minecraft_check.py'
       - 'scripts/ci/minecraft_world_ready.py'
       - 'tests/test_desktop_world.py'
+      - 'scripts/ci/export_desktop_media.py'
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
 jobs:
   desktop-world:
     runs-on: ubuntu-24.04
@@ -32,6 +33,21 @@ jobs:
           command -v google-chrome
       - name: Build over real external websites with actual Minecraft pixels and X11 mouse events
         run: bash scripts/ci/desktop-world.sh
+      - name: Publish verified README demo images
+        if: success() && github.ref == 'refs/heads/main' && github.event_name == 'push'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/ci/export_desktop_media.py
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/media/minecraft-anywhere-x11.gif docs/media/minecraft-anywhere-wikipedia.png docs/media/minecraft-anywhere-example-com.png
+          if git diff --cached --quiet; then
+            echo 'Verified demo media is unchanged'
+          else
+            git commit -m 'docs: publish actual Minecraft desktop building demo'
+            git push origin HEAD:main
+          fi
       - uses: actions/upload-artifact@v4
         if: always()
         with:
