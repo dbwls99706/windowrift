@@ -1,5 +1,31 @@
 # WindowRift
 
+> **Native object portals across application boundaries, not just cutout images.**
+
+**Status: v0.11.0 experimental.** A capability-first, opt-in adapter interface
+connects game-owned object state to a desktop representation and back. Real
+Minecraft Java 1.21.1 blocks preserve original block state in a world vault.
+Tagged living mobs retain their **original native entity UUID** in a
+separate server-side stasis vault while a draggable Qt representation appears
+above other application windows. Their gameplay AI remains in Minecraft,
+paused while outside the visible map.
+
+This is **not yet a universal solution for arbitrary executables**. Apps
+without supported state access still have the legacy visual-only cutout demo.
+The actual Minecraft graphical client is **not** launched by the server-side
+proof: don't mistake headless-game-server + desktop UI screenshots for
+seamless visual extraction from a real playable game window.
+
+- [Stateful application adapter specification](docs/PORTAL_ADAPTERS.md)
+- [Native same-UUID Minecraft mob handoff](docs/MINECRAFT_MOBS.md)
+- [Existing stateful Minecraft block handoff](docs/MINECRAFT_REAL_STATE.md)
+- Native commands: \`windowrift-portal adapters\` and \`windowrift-mob\`
+- Proof workflows: [native Minecraft mob](.github/workflows/real-mob.yml),
+  [native Minecraft blocks](.github/workflows/real-minecraft.yml)
+
+## Legacy visual-only demos
+
+
 ## Experimental: real Minecraft Java world → desktop → world
 
 **This is a separate, state-backed adapter.** It moves an *actual Minecraft
