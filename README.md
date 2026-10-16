@@ -11,8 +11,6 @@ widget represents the same tracked ID. On return, Minecraft restores the
 saved game block from that vault at the chosen destination, then clears the
 vault. The original identity survives another pickup/return cycle.
 
-![Visual demo from the older Minecraft Classic branch, not a state-backed Java world transfer](docs/media/minecraft-anywhere-x11.gif)
-
 **Do not mistake the GIF above for the new world's integration proof:** it is
 a legacy Minecraft Classic visual overlay. The **new** actual-world experiment
 is verified separately by

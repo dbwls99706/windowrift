@@ -10,7 +10,7 @@ You must own Minecraft Java Edition and control a local dedicated vanilla
 server; RCON is **not** enabled for ordinary unmodified single-player worlds.
 Connect your real client to the server, e.g. at localhost:25565.
 
-In server.properties, on a private server bound to loopback:
+In server.properties, for a server accessed only from your own computer:
 
 ```properties
 server-ip=127.0.0.1
@@ -19,7 +19,7 @@ rcon.port=25575
 rcon.password=CHOOSE_A_LONG_PRIVATE_PASSWORD
 ```
 
-Do not expose RCON or this test server to the Internet. Use a new Creative
+RCON may listen on all interfaces even when server-ip is set to 127.0.0.1.\nUse a host firewall to block inbound RCON connections; never expose the port to\nthe Internet. Do not expose this test server to the Internet. Use a new Creative
 flat world, not a valuable survival world. The adapter is limited to one
 dimension per ledger and a whitelist of ordinary blocks. It **rejects block
 entities, chests, signs, inventories, players, entities and modded blocks**.
@@ -58,7 +58,7 @@ windowrift-mc list
 
 The game block disappears from its source coordinate. A reserved
 force-loaded block cell retains its exact Minecraft block state including
-its direction. A durable ledger stores the WindowRift identity.
+its direction. A durable ledger stores the WindowRift identity. Vanilla Minecraft blocks do\nnot natively have UUIDs; this stable ID belongs to WindowRift's recorded\nblock transfer and does not mean Minecraft creates a new persistent entity.
 
 Open the native desktop block representation and move it by dragging:
 
