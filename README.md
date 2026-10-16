@@ -25,6 +25,12 @@ Only the focused WindowRift control panel receives gameplay keys. This is
 For arbitrary programs the extracted actor is still an OS-level visual
 overlay, not a modification of the game process or an export of its live AI.
 
+## Minecraft Classic: mine and build real browser elements
+
+Take a visible block from the **official Minecraft Classic game running in Chrome**, then play it across the desktop with A/D, Space and Shift. In the separately opened [Block Arena](examples/minecraft-rift.html), **E removes actual HTML blocks** and **F creates new DOM blocks** textured with the captured game pixels. Reloading the page preserves mined and built blocks.
+
+This is **keyboard-controlled**, not a timed animation; the browser changes its actual DOM rather than only counting collisions. The original Minecraft world is **read-only** and the browser arena is an explicit local opt-in. [Setup and verification guide](docs/MINECRAFT_PLAY.md) · [Automated real-game keyboard test](.github/workflows/minecraft-play.yml).
+
 ## Chrome omnibox: recorded from actual running windows
 
 ![Actual X11 recording: the playable game source, an OS-level actor crossing to Chromium's native address/search bar, and real keyboard input in the omnibox.](docs/media/omnibox-handoff.gif)

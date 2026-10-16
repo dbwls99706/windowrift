@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>WindowRift Block Arena</title>
+  <style>
+    :root { color-scheme: dark; background: #141b20; color: #e9ece7; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; overflow: hidden; }
+    header { margin: 0; padding: 19px 23px 12px; border-bottom: 2px solid #47554e; background: #171e22; }
+    header h1 { margin: 0; line-height: 1; font-size: clamp(26px, 4.3vw, 42px); font-weight: 900; letter-spacing: -1.8px; }
+    header h1 b { color: #cfe969; }
+    .subtitle { margin-top: 6px; color: #aeb8ad; font-size: 12px; }
+    .connect { display: flex; gap: 9px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
+    #token { padding: 8px; background: #0b1215; border: 1px solid #69766c; color: #fff; border-radius: 0; width: min(48%, 220px); }
+    button { border: 1px solid #c3d49c; border-bottom: 4px solid #566449; color: #171e22; background: #d7e9ad; font-family: inherit; font-weight: 800; padding: 7px 11px; cursor: pointer; }
+    #connection { font-size: 11px; color: #c8ad73; }
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin: 0; background: #556053; }
+    .stats > div { padding: 12px 17px; background: #232d30; }
+    .stats small { display: block; font-size: 10px; text-transform: uppercase; color: #9ead9e; }
+    .stats strong { font-size: 29px; font-weight: 800; font-variant-numeric: tabular-nums; }
+    #arena { position: absolute; top: 211px; bottom: 46px; left: 15px; right: 15px; overflow: hidden; border: 2px solid #66756a; background: repeating-linear-gradient(90deg,#213039 0px,#213039 51px,#26353c 52px,#26353c 53px), linear-gradient(#273e41,#1b2226); }
+    #arena::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 13px; background: repeating-linear-gradient(90deg,#869962 0px,#869962 22px,#6d8659 23px,#6d8659 34px); border-top: 3px solid #bed78d; pointer-events: none; }
+    #arena .sign { position:absolute; top: 15px; left: 16px; font-size: 11px; color: #b2c2b0; line-height: 1.7; pointer-events: none; }
+    .block { position:absolute; width: 79px; height: 79px; transform: translate(-50%,0); display: grid; place-items: center; box-shadow: inset -6px -6px 0 #0005, inset 6px 6px 0 #fff2, 0 6px 0 #0e1418; border: 3px solid #11191a; transition: none; image-rendering: pixelated; }
+    .block.wood { background: repeating-linear-gradient(0deg, #8e6136 0px, #8e6136 12px, #a47745 13px, #a47745 17px); }
+    .block.stone { background: repeating-linear-gradient(90deg, #7d8a88 0px,#7d8a88 20px,#6b7678 22px,#6b7678 34px); }
+    .block.glass { background: #64a7aeaa; border-color: #d3eaeb; }
+    .block.moss { background: repeating-linear-gradient(0deg,#567a43 0px,#567a43 15px,#79965c 16px,#79965c 20px); }
+    .block span { background: #0b1216cc; padding: 2px 5px; font-size: 10px; color: #e7ede6; transform: translateY(44px); text-transform: uppercase; }
+    .block.added { box-shadow: inset -6px -6px 0 #0005, inset 6px 6px 0 #fff2, 0 0 0 3px #bde88f; }
+    .block.added img { width:100%; height:100%; object-fit: contain; image-rendering: pixelated; }
+    .chip { position:absolute; width:12px; height:12px; pointer-events: none; z-index: 10; animation: fall .72s ease-in forwards; }
+    @keyframes fall { to { opacity: 0; transform: translate(var(--dx),var(--dy)) rotate(420deg); } }
+    .block.mined { animation: mine .17s steps(2) forwards; }
+    @keyframes mine { to { opacity:0; transform: translate(-50%,0) scale(.68) rotate(12deg); } }
+    #message { position: absolute; bottom: 8px; left: 16px; right: 16px; color: #dce7c8; font-size: 12px; background: #10181bc7; padding: 6px 9px; min-height: 28px; }
+    footer { position: absolute; bottom: 0; left:0;right:0; height: 46px; padding: 13px 18px; background:#172024; color:#b2bea8; border-top:1px solid #556358; font-size: 11px; }
+    .key { border: 1px solid #8b9c7e; padding: 3px 5px; color:#ebf5d9; margin-right:4px; }
+    @media (max-width: 560px) { #arena { top:244px; } .stats strong {font-size:23px} footer {font-size:9px} }
+  </style>
+</head>
+<body>
+<header>
+  <h1>MINE <b>THE WEB.</b></h1>
+  <div class="subtitle">Minecraft Classic block → real desktop actor → actual browser DOM</div>
+  <div class="connect"><input id="token" type="password" autocomplete="off" placeholder="Desktop session token"><button id="connect">CONNECT</button><button id="reset">RESET ARENA</button><span id="connection" role="status">Not connected</span></div>
+</header>
+<section class="stats" aria-label="Game state">
+  <div><small>Destroyed HTML blocks</small><strong id="blocks-mined">0</strong></div>
+  <div><small>Placed HTML blocks</small><strong id="blocks-built">0</strong></div>
+  <div><small>Desktop contacts</small><strong id="impacts">0</strong></div>
+</section>
+<section id="arena" aria-label="Real HTML arena">
+  <div class="sign">Not a canvas. These are real HTML elements.<br>Mine one: its DOM node disappears.<br>Place one: a new node is created and saved.</div>
+  <div id="blocks"></div>
+  <div id="message" role="status">Connect the desktop controller, then cross the window boundary.</div>
+</section>
+<footer><span class="key">A</span><span class="key">D</span> MOVE &nbsp;<span class="key">SPACE</span> JUMP &nbsp;<span class="key">E</span> MINE &nbsp;<span class="key">F</span> PLACE &nbsp;<span class="key">ESC</span> QUIT</footer>
+<script src="minecraft-rift.js"></script>
+</body></html>
