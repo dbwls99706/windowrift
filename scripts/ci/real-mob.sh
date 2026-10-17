@@ -47,9 +47,19 @@ done
 xprop -root _NET_SUPPORTED 2>/dev/null | grep -q _NET_CLIENT_LIST || {
   echo 'Window manager failed'; exit 1;
 }
+# Show the native Minecraft-backed projection over an actual unrelated
+# application window rather than a mocked/synthesized browser screenshot.
+google-chrome --no-sandbox --disable-gpu --disable-dev-shm-usage --no-first-run \
+  --no-default-browser-check --user-data-dir="$RUNNER_TEMP/wr-mob-browser" \
+  --window-size=850,740 --window-position=30,90 \
+  'https://example.com/' > artifacts/real-mob/chrome.log 2>&1 & cpid=$!
+sleep 2
+kill -0 "$cpid" 2>/dev/null || { echo 'Chrome could not start'; cat artifacts/real-mob/chrome.log; exit 1; }
 export QT_QPA_PLATFORM=xcb
 python scripts/ci/real_mob_gui_proof.py | tee artifacts/real-mob/gui.log
 test -s artifacts/real-mob/living-mob-outside.png
 test -s artifacts/real-mob/living-mob-returned.png
+test -s artifacts/real-mob/living-mob-keyboard-x11.gif
+kill "$cpid" 2>/dev/null || true
 kill "$wpid" "$xpid" 2>/dev/null || true
 
