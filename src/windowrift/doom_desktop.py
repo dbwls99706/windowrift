@@ -80,6 +80,8 @@ class DoomDesktop(QWidget):
             raise WadError("Original IWAD has no supported Doom Imp frames")
         self.actor = DoomSprite(frames, (game.bounds.x + game.bounds.width - 90,
                                         game.bounds.y + game.bounds.height - 150))
+        self.original_x = self.actor.x()
+        self.playback_verified = False
         self.player = Player(float(self.actor.x()), float(self.actor.y()),
                              float(self.actor.width()), float(self.actor.height()))
         self.keys = KeyLatch()
@@ -171,6 +173,7 @@ class DoomDesktop(QWidget):
         elif self.sequence == 1:
             QTest.keyPress(self, Qt.Key.Key_Space)
         elif self.sequence == 2:
+            self.playback_verified = self.player.x > self.original_x + 30
             QTest.keyRelease(self, Qt.Key.Key_Space)
         elif self.sequence == 3:
             QTest.keyRelease(self, Qt.Key.Key_D)
@@ -233,7 +236,10 @@ def main():
         panel = DoomDesktop(args.doom_wad, args.desktop_world, record=args.record_gif)
     except (RuntimeError, WadError, OSError, ValueError) as exc:
         parser.error(str(exc))
-    sys.exit(app.exec())
+    result = app.exec()
+    if args.record_gif and not panel.playback_verified:
+        parser.exit(1, "DOOM keyboard playback did not move the desktop actor\\n")
+    sys.exit(result)
 
 
 if __name__ == "__main__":
