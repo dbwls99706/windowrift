@@ -55,6 +55,45 @@ class DesktopWorld:
         s = self.size
         return int(x // s) * s, int(y // s) * s
 
+    def colliding_blocks(self, x: float, y: float, width: float,
+                         height: float) -> tuple[Block, ...]:
+        """Return solid blocks overlapping a screen-space actor rectangle.
+
+        The bounds use half-open intervals, so merely touching an edge does
+        not count as penetration. This query is independent of window focus,
+        browser DOM, and the application's origin.
+        """
+        import math
+        values = (x, y, width, height)
+        if not all(isinstance(v, (int, float)) and not isinstance(v, bool)
+                   and math.isfinite(v) for v in values):
+            raise ValueError('Actor bounds must be finite numbers')
+        if width <= 0 or height <= 0:
+            raise ValueError('Actor bounds must have positive dimensions')
+        right, bottom = x + width, y + height
+        if not math.isfinite(right) or not math.isfinite(bottom):
+            raise ValueError('Actor bounds overflow')
+        return tuple(b for b in self.blocks
+                     if b.x < right and b.x + self.size > x
+                     and b.y < bottom and b.y + self.size > y)
+
+    def supported_position(self, x: float, y: float, width: float,
+                           height: float, *, tolerance: float = 1.0) -> bool:
+        """Check whether a desktop actor has block support directly below.
+
+        Callers retain control of game physics; this supplies a deterministic
+        collision primitive for actors from multiple application adapters.
+        """
+        import math
+        if not isinstance(tolerance, (int, float)) or isinstance(tolerance, bool):
+            raise ValueError('Invalid support tolerance')
+        if not math.isfinite(tolerance) or tolerance <= 0:
+            raise ValueError('Invalid support tolerance')
+        self.colliding_blocks(x, y, width, height)
+        foot = y + height
+        return any(b.x < x + width and b.x + self.size > x
+                   and abs(b.y - foot) <= tolerance for b in self.blocks)
+
     def begin(self) -> None:
         if self._stroke_origin is not None:
             raise RuntimeError('A build stroke is already active')
