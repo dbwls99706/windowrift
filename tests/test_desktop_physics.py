@@ -29,7 +29,9 @@ def test_player_can_land_on_desktop_block():
 def test_player_cannot_walk_through_block():
     w = DesktopWorld()
     w.place(288, 384, "stone")
-    p = Player(228, 394, 30, 38, ground="floor")
+    for x in range(192, 624, 48):
+        w.place(x, 432, "planks")
+    p = Player(228, 394, 30, 38)
     for _ in range(80):
         p = desktop_step(p, Controls(right=True), 1/60, SCREEN, w)
     assert p.x + p.width <= 288
