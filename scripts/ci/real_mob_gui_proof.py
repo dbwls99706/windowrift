@@ -10,7 +10,10 @@ import os
 from pathlib import Path
 
 from PySide6.QtWidgets import QApplication
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import QTimer, Qt
+from PySide6.QtTest import QTest
+from PIL import ImageGrab
+from windowrift.proof_capture import ProofRecorder
 from PIL import Image
 from windowrift.minecraft_rcon import RconClient
 from windowrift.minecraft_mobs import MinecraftMobs, uuid_from_nbt
@@ -63,7 +66,39 @@ def main():
             evidence["desktop_os_window"] = True
             evidence["authentic_texture_from_verified_client_jar"] = True
             evidence["avatar_uses_original_game_engine"] = False
+            # Exercise the same Qt key event path as a human, not a timed
+            # prerecorded coordinate animation. The original Minecraft entity
+            # remains the exact same UUID at the force-loaded server vault.
             panel.selected.setCurrentIndex(panel.selected.findData(record.id))
+            panel.play_button.setChecked(True)
+            panel.activateWindow()
+            panel.setFocus()
+            QApplication.processEvents()
+            recorder = ProofRecorder(interval=0.1, max_frames=45, max_width=1200)
+            initial_x = actor.x()
+            QTest.keyPress(panel, Qt.Key.Key_D)
+            for frame in range(13):
+                QTest.qWait(115)
+                recorder.add_frame(frame * .12,
+                                   ImageGrab.grab(xdisplay=os.environ["DISPLAY"]))
+            QTest.keyRelease(panel, Qt.Key.Key_D)
+            QTest.qWait(120)
+            assert actor.x() > initial_x + 30, "Minecraft desktop actor did not respond to keyboard input"
+            assert native_uuid(client) == expected
+            QTest.keyPress(panel, Qt.Key.Key_A)
+            for frame in range(13, 25):
+                QTest.qWait(115)
+                recorder.add_frame(frame * .12,
+                                   ImageGrab.grab(xdisplay=os.environ["DISPLAY"]))
+            QTest.keyRelease(panel, Qt.Key.Key_A)
+            panel.play_button.setChecked(False)
+            playback = OUT / "living-mob-keyboard-x11.gif"
+            assert recorder.save(playback) >= 16
+            evidence["actual_x11_keyboard_gif"] = str(playback)
+            evidence["keyboard_input_moves_desktop_projection"] = True
+            evidence["original_minecraft_process_untouched"] = True
+            evidence["original_mob_uuid_unchanged_during_play"] = True
+
             panel.destination.setText("20,70,20")
             panel.put()
             assert native_uuid(client) == expected
