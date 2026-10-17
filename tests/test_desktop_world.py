@@ -73,3 +73,26 @@ def test_no_screen_or_browser_binding():
     snapshot=w.to_json()
     assert 'chrome' not in snapshot.lower() and 'window' not in snapshot.lower()
     assert Block(960,480,'planks') in w.blocks
+
+def test_desktop_collision_for_any_adapter_actor():
+    w = DesktopWorld(size=48)
+    w.place(96, 144, 'stone')
+    w.place(-48, 144, 'planks')
+    assert w.colliding_blocks(100, 100, 24, 44) == ()
+    assert w.supported_position(100, 100, 24, 44)
+    assert not w.supported_position(144, 100, 24, 44)
+    assert len(w.colliding_blocks(110, 130, 20, 20)) == 1
+    assert len(w.colliding_blocks(-40, 140, 20, 20)) == 1
+    assert w.colliding_blocks(144, 144, 10, 10) == ()
+
+
+@pytest.mark.parametrize('args', [
+    (0, 0, 0, 10), (0, 0, -1, 10),
+    (float('nan'), 0, 10, 10),
+    (0, float('inf'), 10, 10),
+    (0, 0, float('inf'), 10),
+    (True, 0, 10, 10),
+])
+def test_desktop_collision_rejects_invalid_geometry(args):
+    with pytest.raises(ValueError):
+        DesktopWorld().colliding_blocks(*args)
