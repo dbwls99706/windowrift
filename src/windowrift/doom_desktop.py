@@ -117,6 +117,7 @@ class DoomDesktop(QWidget):
         self.setStyleSheet("QWidget{background:#1c1b20;color:#f8eee4}"
                            "QPushButton{background:#493437;padding:10px}")
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.move(850, 585)
         self.show()
         self.setFocus()
         QApplication.instance().installEventFilter(self)
