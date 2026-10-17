@@ -16,7 +16,7 @@ on:
       - 'tests/test_mob_render.py'
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
 jobs:
   native-mob:
     runs-on: ubuntu-24.04
@@ -48,3 +48,18 @@ jobs:
           path: artifacts/real-mob/
           retention-days: 14
           if-no-files-found: warn
+
+      - name: Publish verified Minecraft mob keyboard recording
+        if: success() && github.ref == 'refs/heads/feat/gameplay-cross-app-demos'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s artifacts/real-mob/living-mob-keyboard-x11.gif
+          cp artifacts/real-mob/living-mob-keyboard-x11.gif docs/media/minecraft-mob-keyboard-x11.gif
+          git config user.name "dbwls99706"
+          git config user.email "yujinhong3@gmail.com"
+          git add docs/media/minecraft-mob-keyboard-x11.gif
+          if ! git diff --cached --quiet; then
+            git commit -m "docs: add real Minecraft mob desktop gameplay"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
