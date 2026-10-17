@@ -10,6 +10,7 @@ on:
       - 'src/windowrift/minecraft_adapters.py'
       - 'scripts/ci/real_mob_roundtrip.py'
       - 'scripts/ci/real-mob.sh'
+      - 'scripts/ci/real_mob_gui_proof.py'
       - 'tests/test_minecraft_mobs.py'
       - 'tests/test_portal_api.py'
       - 'tests/test_mob_render.py'
@@ -31,6 +32,8 @@ jobs:
           python-version: '3.12'
       - name: Install dependencies and run native-state tests
         run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends xvfb openbox x11-utils libegl1 libopengl0 libxcb-cursor0 libxkbcommon-x11-0 libxcb-xinerama0 libxcb-icccm4 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-image0 libx11-xcb1
           python -m pip install -e '.[dev]'
           python -m compileall -q src/windowrift scripts/ci
           python -m pytest -q tests/test_minecraft_mobs.py tests/test_portal_api.py tests/test_mob_render.py

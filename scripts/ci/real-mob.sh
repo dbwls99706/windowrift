@@ -29,3 +29,27 @@ trap cleanup EXIT
 export WINDOWRIFT_RCON_PASSWORD='windowrift-temporary-mob-ci-only-2026'
 python scripts/ci/real_mob_roundtrip.py | tee artifacts/real-mob/roundtrip.log
 test -s artifacts/real-mob/mob-proof.json
+
+# The real server remains running during this GUI proof. Show a projection
+# backed by the live stashed mob's UUID, never claim graphical client footage.
+export DISPLAY=:97
+Xvfb :97 -screen 0 1600x900x24 -nolisten tcp > artifacts/real-mob/xvfb.log 2>&1 & xpid=$!
+for i in $(seq 1 40); do
+  xprop -root >/dev/null 2>&1 && break
+  sleep .2
+done
+xprop -root >/dev/null 2>&1 || { echo 'Xvfb failed'; exit 1; }
+openbox > artifacts/real-mob/openbox.log 2>&1 & wpid=$!
+for i in $(seq 1 40); do
+  xprop -root _NET_SUPPORTED 2>/dev/null | grep -q _NET_CLIENT_LIST && break
+  sleep .2
+done
+xprop -root _NET_SUPPORTED 2>/dev/null | grep -q _NET_CLIENT_LIST || {
+  echo 'Window manager failed'; exit 1;
+}
+export QT_QPA_PLATFORM=xcb
+python scripts/ci/real_mob_gui_proof.py | tee artifacts/real-mob/gui.log
+test -s artifacts/real-mob/living-mob-outside.png
+test -s artifacts/real-mob/living-mob-returned.png
+kill "$wpid" "$xpid" 2>/dev/null || true
+
