@@ -31,6 +31,7 @@ windowrift-real = "windowrift.minecraft_desktop:main"
 windowrift-mob = "windowrift.minecraft_mob_desktop:main"
 windowrift-portal = "windowrift.portal_cli:main"
 windowrift-inspect = "windowrift.binary_cli:main"
+windowrift-doom = "windowrift.doom_desktop:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
