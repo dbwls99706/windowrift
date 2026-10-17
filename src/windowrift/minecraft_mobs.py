@@ -12,6 +12,7 @@ import json
 import math
 from pathlib import Path
 import re
+import time
 from uuid import UUID, uuid4
 
 from .minecraft_transfer import _write_json, TransferError, coord, xyz
@@ -218,8 +219,24 @@ class MinecraftMobs:
 
     def _tp(self, selector: str, point: tuple[float, float, float]):
         self._command(f"tp {selector} {point[0]:.3f} {point[1]:.3f} {point[2]:.3f}")
-        if not self._at(selector, point):
-            raise TransferError("Minecraft did not confirm mob teleport")
+        # A force-loaded destination chunk can take a few server ticks to
+        # expose its newly teleported entity to selectors. Never treat an
+        # unavailable entity as success; wait only for the original target.
+        last_error = None
+        for attempt in range(35):
+            try:
+                if self._at(selector, point):
+                    return
+            except TransferError as exc:
+                last_error = exc
+                if "No entity was found" not in str(exc):
+                    raise
+            if attempt < 34:
+                time.sleep(0.20)
+        raise TransferError(
+            "Minecraft could not verify the same mob at its teleport destination"
+            + (f": {last_error}" if last_error else "")
+        )
 
     def _slot(self) -> tuple[int, int, int]:
         used = {r.vault for r in self.records.values()}
