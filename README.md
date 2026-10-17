@@ -6,7 +6,7 @@
 connects game-owned object state to a desktop representation and back. Real
 Minecraft Java 1.21.1 blocks preserve original block state in a world vault.
 Tagged living mobs retain their **original native entity UUID** in a
-separate server-side stasis vault while a draggable Qt representation appears
+separate server-side stasis vault while a keyboard-controlled or draggable Qt representation appears
 above other application windows. Their gameplay AI remains in Minecraft,
 paused while outside the visible map.
 
@@ -37,6 +37,68 @@ windowrift-inspect --pid 12345 --output process.json
 **Binary discovery does not remove or control living game objects.** It does not patch files, read game-object memory, inject hooks or bypass anti-cheat. REA/Ghidra-assisted reversing and a validated per-engine runtime adapter are further steps toward stateful portals, not capabilities this command already provides. For the precise evidence/verification boundary, see [binary discovery and portal research](docs/BINARY_DISCOVERY.md).
 
 The [native game binary CI](.github/workflows/binary-discovery.yml) inspects a real packaged Chocolate Doom executable and verifies its SHA-256 is unchanged. That is proof of executable analysis, **not a graphical game crossover**.
+
+## Verified desktop gameplay: Minecraft and DOOM
+
+These are **GIF recordings from actual Linux X11 desktops**, not composited
+mockups or AI-generated game footage. They demonstrate three distinct
+levels of integration; none proves automatic state extraction from every EXE.
+
+### 1. Minecraft Classic: put blocks *outside* the game, onto any app
+
+![Real Minecraft Classic hotbar blocks installed onto an unrelated Wikipedia page, Chrome's native toolbar, and the desktop; the browser navigates and blocks remain](docs/media/minecraft-anywhere-x11.gif)
+
+- **Source:** the official Minecraft Classic game running in a browser.
+- **Action:** left-click/drag to place blocks over unrelated real windows,
+  right-click to mine, 1-8 to change material, Esc to browse normally.
+- **Boundary:** visually independent X11 desktop blocks; they do **not**
+  modify native Minecraft world cells or unrelated websites.
+- **Proof:** [actual X11 recording and browser verification](https://github.com/dbwls99706/windowrift/actions/runs/38836891816).
+
+### 2. Minecraft Java: control the projection of the **same-UUID** living mob
+
+![A real Minecraft Java server mob's state-backed zombie projection responds to keyboard controls on a genuine X11 desktop with Chrome](docs/media/minecraft-mob-keyboard-x11.gif)
+
+- **Source:** a verified Mojang 1.21.1 server with one operator-tagged mob and
+  the local game client JAR supplying its actual zombie texture.
+- **Action:** `windowrift-mob` → `Lift real mob` → `Play selected mob on desktop`,
+  then A/D or arrows, W/Space, Shift, and S+Space. The shared desktop block
+  world acts as physical support and solid walls for the projection.
+- **State:** the original entity stays in the Minecraft server stasis vault
+  with **its original UUID** and can be returned to the world.
+- **Boundary:** gameplay AI and renderer remain in Minecraft; the outside
+  actor uses WindowRift physics. The recording does **not** show the
+  graphical Minecraft client, only the real server-backed Qt desktop actor.
+- **Proof:** [Mojang server + actual GUI + keyboard GIF + native UUID checks](https://github.com/dbwls99706/windowrift/actions/runs/39045677390).
+
+```bash
+# Linux X11, your own backed-up 1.21.1 RCON-enabled test server.
+# Tag a mob in the world first; see docs/MINECRAFT_MOBS.md.
+windowrift-mob --game-jar "$HOME/.minecraft/versions/1.21.1/1.21.1.jar"
+```
+
+### 3. Original DOOM Shareware: play an Imp across real desktop windows
+
+![DOOM 1.9 shareware and Chrome running together while an original WAD Imp sprite is steered with real Qt keyboard events in the independent desktop world](docs/media/doom-keyboard-x11.gif)
+
+- **Source:** actual Chocolate Doom running Doom 1.9 shareware, with
+  authentic Imp sprite frames decoded from a locally supplied `doom1.wad`.
+- **Action:** `windowrift-doom` after starting the real game; A/D or arrows
+  to walk across windows, W/Space to jump, Shift to sprint. Shared Minecraft
+  Classic desktop blocks are also collision surfaces if placed beforehand.
+- **Boundary:** **visual-only**. The Imp is *not* a transferred Doom engine
+  actor, the original game process is untouched, and source enemy health/AI
+  is not synchronized.
+- **Proof:** [actual original-game run, keyboard-event playback and GIF export](https://github.com/dbwls99706/windowrift/actions/runs/39045484559).
+
+```bash
+# Use a Doom shareware WAD you lawfully obtained.
+chocolate-doom -iwad /path/to/doom1.wad -window -warp 1 1 -nosound -nomusic
+# In a second terminal, same X11 display:
+windowrift-doom --doom-wad /path/to/doom1.wad
+```
+
+[Controls, state guarantees, reverse-engineering boundaries and reproduction](docs/CROSS_APP_GAMEPLAY.md)
 
 ## Legacy visual-only demos
 
