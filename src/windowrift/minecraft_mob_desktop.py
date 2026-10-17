@@ -5,8 +5,9 @@ from io import BytesIO
 import os
 from pathlib import Path
 import sys
+import time
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt, QTimer, QEvent
 from PySide6.QtGui import QPainter, QPixmap
 from PySide6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout,
                                QLineEdit, QLabel, QPushButton, QComboBox,
@@ -16,6 +17,10 @@ from .minecraft_mobs import MinecraftMobs, MOB_TYPES, TransferError
 from .minecraft_rcon import RconClient
 from .minecraft_cli import parse_location
 from .mob_render import render_mob
+from .controller import Controls, KeyLatch, Player
+from .desktop_world import DesktopWorld
+from .desktop_physics import desktop_step
+from .geometry import Rect
 
 
 class WorldMob(QWidget):
@@ -70,14 +75,25 @@ class WorldMob(QWidget):
         if event.button() == Qt.MouseButton.LeftButton and self.drag_origin is not None:
             self.drag_origin = None
             self.panel.persist(self)
+            self.panel.dragged(self)
             event.accept()
 
 
 class MobPanel(QWidget):
-    def __init__(self, engine: MinecraftMobs, game_jar: Path | None = None):
+    def __init__(self, engine: MinecraftMobs, game_jar: Path | None = None,
+                 desktop_world: Path | None = None):
         super().__init__()
         self.engine, self.jar = engine, game_jar
         self.actors = {}
+        self.world_file = desktop_world or Path.home() / '.local/share/windowrift/desktop-world.json'
+        self.world = DesktopWorld.load(self.world_file)
+        self.world_stamp = None
+        self.keys = KeyLatch()
+        self.player = None
+        self.play_id = None
+        self.last_tick = time.monotonic()
+        self.last_saved = self.last_tick
+        self.last_world_poll = 0.0
         self.setWindowTitle("WindowRift | Living Minecraft Mobs")
         self.setMinimumWidth(580)
         layout = QVBoxLayout(self)
@@ -89,6 +105,13 @@ class MobPanel(QWidget):
                       "projection; leaving this panel does not release a stashed mob.")
         note.setWordWrap(True)
         layout.addWidget(note)
+        gameplay = QLabel("Desktop play: select a transferred mob, press Play, then use A/D or arrows "
+                         "to walk, Space/W to jump, Shift to sprint, and S+Space to drop "
+                         "through a block. Blocks are shared with the Minecraft Classic "
+                         "desktop builder through its saved world file. The live mob remains "
+                         "in server stasis until you press Return SAME mob.")
+        gameplay.setWordWrap(True)
+        layout.addWidget(gameplay)
         form = QFormLayout()
         self.tag = QLineEdit("windowrift_demo")
         form.addRow("In-game entity tag", self.tag)
@@ -109,12 +132,99 @@ class MobPanel(QWidget):
             button.clicked.connect(action)
             controls.addWidget(button)
         layout.addLayout(controls)
+        self.play_button = QPushButton("Play selected mob on desktop")
+        self.play_button.setCheckable(True)
+        self.play_button.toggled.connect(self.toggle_play)
+        layout.addWidget(self.play_button)
         self.status = QLabel("Ready. Operator-owned local Minecraft RCON server only.")
         layout.addWidget(self.status)
         self.setStyleSheet("QWidget{background:#171d23;color:#e4eaf1}"
                            "QLineEdit,QComboBox,QPushButton{padding:8px;background:#303b48;"
                            "border-radius:5px}")
         self.refresh()
+        QApplication.instance().installEventFilter(self)
+        self.selected.currentIndexChanged.connect(self.selection_changed)
+        self.frame_timer = QTimer(self)
+        self.frame_timer.timeout.connect(self.tick_desktop)
+        self.frame_timer.start(16)
+
+    def selection_changed(self, _index):
+        if self.play_id != self.selected.currentData():
+            self.play_button.setChecked(False)
+
+    def toggle_play(self, active):
+        self.keys.clear()
+        self.player = None
+        self.play_id = self.selected.currentData() if active else None
+        if active:
+            actor = self.actors.get(self.play_id)
+            if actor is None:
+                self.play_button.setChecked(False)
+                self.status.setText("Take an actual Minecraft mob outside before desktop play")
+                return
+            self.player = Player(float(actor.x()), float(actor.y()),
+                                 float(actor.width()), float(actor.height()))
+            self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+            self.setFocus()
+            self.status.setText("Playing the same-UUID mob projection; server AI is paused")
+        else:
+            self.status.setText("Desktop controls released. The original mob remains recoverable")
+
+    def eventFilter(self, watched, event):
+        if (self.play_button.isChecked() and self.isActiveWindow()
+                and not isinstance(QApplication.focusWidget(), (QLineEdit, QComboBox))
+                and event.type() in (QEvent.Type.KeyPress, QEvent.Type.KeyRelease)
+                and not event.isAutoRepeat()):
+            names = {Qt.Key.Key_A: "a", Qt.Key.Key_D: "d",
+                     Qt.Key.Key_Left: "left", Qt.Key.Key_Right: "right",
+                     Qt.Key.Key_W: "w", Qt.Key.Key_Up: "up",
+                     Qt.Key.Key_S: "s", Qt.Key.Key_Down: "down",
+                     Qt.Key.Key_Space: "space", Qt.Key.Key_Shift: "shift"}
+            name = names.get(event.key())
+            if name:
+                if event.type() == QEvent.Type.KeyPress:
+                    self.keys.press(name)
+                else:
+                    self.keys.release(name)
+                return True
+            if event.key() == Qt.Key.Key_Escape and event.type() == QEvent.Type.KeyPress:
+                self.play_button.setChecked(False)
+                return True
+        return super().eventFilter(watched, event)
+
+    def dragged(self, actor):
+        if self.play_id == actor.identity.id and self.player is not None:
+            self.player = Player(float(actor.x()), float(actor.y()),
+                                 float(actor.width()), float(actor.height()))
+
+    def tick_desktop(self):
+        now = time.monotonic()
+        dt = min(0.05, now - self.last_tick)
+        self.last_tick = now
+        if not self.play_button.isChecked() or self.player is None:
+            return
+        actor = self.actors.get(self.play_id)
+        if actor is None:
+            self.play_button.setChecked(False)
+            return
+        if actor.drag_origin is not None:
+            return
+        if now - self.last_world_poll >= 0.5:
+            self.last_world_poll = now
+            try:
+                stamp = self.world_file.stat().st_mtime_ns if self.world_file.exists() else None
+                if stamp != self.world_stamp:
+                    self.world = DesktopWorld.load(self.world_file)
+                    self.world_stamp = stamp
+            except (OSError, ValueError) as exc:
+                self.status.setText("Desktop block world reload failed: " + str(exc))
+        screen = QApplication.primaryScreen().virtualGeometry()
+        bounds = Rect(screen.x(), screen.y(), screen.width(), screen.height())
+        self.player = desktop_step(self.player, self.keys.snapshot(), dt, bounds, self.world)
+        actor.move(round(self.player.x), round(self.player.y))
+        if now - self.last_saved >= 0.4:
+            self.last_saved = now
+            self.persist(actor)
 
     def perform(self, fn):
         try:
@@ -145,6 +255,7 @@ class MobPanel(QWidget):
 
     def refresh(self):
         previous = self.selected.currentData()
+        self.selected.blockSignals(True)
         self.selected.clear()
         outside = set()
         for record in self.engine.snapshot():
@@ -162,8 +273,13 @@ class MobPanel(QWidget):
             index = self.selected.findData(previous)
             if index >= 0:
                 self.selected.setCurrentIndex(index)
+        self.selected.blockSignals(False)
+        if self.play_id not in outside:
+            self.play_button.setChecked(False)
 
     def closeEvent(self, event):
+        self.play_button.setChecked(False)
+        QApplication.instance().removeEventFilter(self)
         for actor in list(self.actors.values()):
             actor.close()
         self.actors.clear()
@@ -177,6 +293,8 @@ def main():
     parser.add_argument("--vault", default="10300,300,10300")
     parser.add_argument("--port", type=int, default=25575)
     parser.add_argument("--game-jar", type=Path)
+    parser.add_argument("--desktop-world", type=Path,
+                        help="Minecraft Classic desktop blocks JSON, shared across windows")
     args = parser.parse_args()
     secret = os.environ.get("WINDOWRIFT_RCON_PASSWORD")
     if not secret:
@@ -185,7 +303,7 @@ def main():
     backend.command("list")
     engine = MinecraftMobs(backend, args.ledger, vault_base=parse_location(args.vault))
     app = QApplication(sys.argv[:1])
-    panel = MobPanel(engine, args.game_jar)
+    panel = MobPanel(engine, args.game_jar, desktop_world=args.desktop_world)
     panel.show()
     sys.exit(app.exec())
 
