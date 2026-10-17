@@ -144,7 +144,11 @@ class DoomDesktop(QWidget):
             self.setFocus()
 
     def eventFilter(self, watched, event):
-        if (self.play_button.isChecked() and self.isActiveWindow()
+        # Qt may report this tool panel as inactive when the transparent
+        # always-on-top actor or Chrome owns X11 window-manager focus. Only
+        # actual Qt key events delivered to THIS process are observed here;
+        # this is not a global keyboard hook.
+        if (self.play_button.isChecked()
                 and event.type() in (QEvent.Type.KeyPress, QEvent.Type.KeyRelease)
                 and not event.isAutoRepeat()):
             key_map = {Qt.Key.Key_A:"a", Qt.Key.Key_D:"d",
@@ -174,6 +178,7 @@ class DoomDesktop(QWidget):
             QTest.keyPress(self, Qt.Key.Key_Space)
         elif self.sequence == 2:
             self.playback_verified = self.player.x > self.original_x + 30
+            print(f"DOOM_KEYBOARD_MOVEMENT={self.player.x-self.original_x:.1f};keys={self.keys.snapshot()}", flush=True)
             QTest.keyRelease(self, Qt.Key.Key_Space)
         elif self.sequence == 3:
             QTest.keyRelease(self, Qt.Key.Key_D)
