@@ -123,3 +123,14 @@ report = {
 Path('artifacts/proof.json').write_text(json.dumps(report, indent=2) + '\n')
 print('Actual game demonstration:', json.dumps(report))
 PY
+
+# The playable mode is a separate, REAL keyboard-event-controlled X11 actor.
+# Chocolate Doom and Chrome remain running during this recording.
+QT_QPA_PLATFORM=xcb python -m windowrift.doom_desktop \
+  --doom-wad "$DOOM_WAD" \
+  --record-gif artifacts/doom-keyboard-x11.gif >artifacts/doom-play.log 2>&1 || {
+    cat artifacts/doom-play.log
+    exit 1
+  }
+grep -q 'ACTUAL_DOOM_KEYBOARD_GIF=' artifacts/doom-play.log
+test -s artifacts/doom-keyboard-x11.gif
