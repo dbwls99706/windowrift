@@ -6,6 +6,10 @@ on:
       - 'scripts/ci/doom-chrome.sh'
       - 'examples/cinematic_omnibox_demo.py'
       - 'src/windowrift/doom_wad.py'
+      - 'src/windowrift/doom_desktop.py'
+      - 'src/windowrift/desktop_physics.py'
+      - 'src/windowrift/desktop_world.py'
+      - 'pyproject.toml'
       - 'src/windowrift/proof_capture.py'
       - 'src/windowrift/omnibox.py'
       - 'src/windowrift/choreography.py'
@@ -15,7 +19,7 @@ on:
       - 'tests/test_doom_wad.py'
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
 jobs:
   doom-shareware:
     runs-on: ubuntu-24.04
@@ -25,7 +29,7 @@ jobs:
       - name: Install source port and X11 tools
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends chocolate-doom xvfb openbox wmctrl x11-utils python3-venv python3-tk libegl1 libopengl0 libxcb-cursor0 libxkbcommon-x11-0
+          sudo apt-get install -y --no-install-recommends chocolate-doom xvfb openbox wmctrl x11-utils python3-venv python3-tk libegl1 libopengl0 libxcb-cursor0 libxkbcommon-x11-0 libxcb-xinerama0 libxcb-icccm4 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-image0 libx11-xcb1
           python3 -m venv .venv
           .venv/bin/python -m pip install -e '.[dev]'
           echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
@@ -49,6 +53,8 @@ jobs:
           path: |
             artifacts/doom-chrome.png
             artifacts/doom-chrome.gif
+            artifacts/doom-keyboard-x11.gif
+            artifacts/doom-play.log
             artifacts/proof.json
             artifacts/game.log
             artifacts/portal.log
@@ -62,3 +68,18 @@ jobs:
             artifacts/windows.txt
           if-no-files-found: warn
           retention-days: 7
+
+      - name: Publish verified DOOM keyboard recording to this feature branch
+        if: success() && github.ref == 'refs/heads/feat/gameplay-cross-app-demos'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s artifacts/doom-keyboard-x11.gif
+          cp artifacts/doom-keyboard-x11.gif docs/media/doom-keyboard-x11.gif
+          git config user.name "dbwls99706"
+          git config user.email "yujinhong3@gmail.com"
+          git add docs/media/doom-keyboard-x11.gif
+          if ! git diff --cached --quiet; then
+            git commit -m "docs: add real DOOM desktop keyboard recording"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
